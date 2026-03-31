@@ -1645,6 +1645,150 @@ style.textContent = `
   .stat-box strong { color: #fff; display: block; font-size: 13px; margin-bottom: 2px; }
 
   .panel.right { left: auto; right: 12px; }
+
+  @media (max-width: 820px) {
+    .panel,
+    .panel.right {
+      left: 8px;
+      right: 8px;
+      top: auto;
+      bottom: 8px;
+      width: auto;
+      max-height: min(52vh, 460px);
+      min-height: 0;
+      border-radius: 20px 20px 16px 16px;
+      box-shadow: 0 22px 48px rgba(0,0,0,0.42);
+      background: rgba(10, 13, 20, 0.94);
+      display: block;
+      overflow-y: auto;
+    }
+
+    .panel::-webkit-scrollbar { width: 4px; }
+    .panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+    .panel-header {
+      padding: 10px 14px 8px;
+      position: relative;
+    }
+
+    .panel-header::before {
+      content: '';
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 44px;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.18);
+    }
+
+    .panel-header h2 {
+      font-size: 14px;
+    }
+
+    .tabs-nav {
+      margin: 8px 12px;
+      padding: 5px;
+      gap: 4px;
+      background: rgba(255,255,255,0.04);
+    }
+
+    .tab-btn {
+      padding: 11px 8px;
+      font-size: 12px;
+      min-height: 42px;
+    }
+
+    .panel-content {
+      padding: 0 12px 10px;
+      overflow: visible;
+      height: auto;
+      min-height: auto;
+      flex: none;
+    }
+
+    .control-card {
+      padding: 10px;
+      margin-bottom: 8px;
+      border-radius: 12px;
+    }
+
+    .section-label {
+      margin-bottom: 8px;
+      font-size: 9px;
+    }
+
+    .btn {
+      min-height: 40px;
+      font-size: 12px;
+    }
+
+    .btn-group-dual {
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .input-group {
+      gap: 10px;
+      flex-wrap: nowrap;
+    }
+
+    .num-input {
+      width: 58px;
+      height: 32px;
+      font-size: 12px;
+    }
+
+    .panel-select {
+      min-height: 40px;
+      font-size: 12px;
+    }
+
+    .presets-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+    }
+
+    .preset-btn {
+      min-height: 38px;
+      font-size: 11px;
+    }
+
+    .grid-tools {
+      grid-template-columns: 1fr !important;
+      gap: 8px !important;
+    }
+
+    .panel-footer {
+      padding: 10px 12px;
+      background: rgba(8, 11, 18, 0.92);
+      backdrop-filter: blur(16px);
+      border-top: none;
+    }
+
+    #meshList {
+      max-height: 120px !important;
+    }
+
+    .slider-row {
+      margin: 10px 0;
+    }
+
+    .input-group {
+      gap: 6px;
+    }
+
+    #panelOpenBtn {
+      top: auto !important;
+      bottom: 12px !important;
+      left: 12px !important;
+      right: auto !important;
+      width: 48px !important;
+      height: 48px !important;
+      border-radius: 14px !important;
+    }
+  }
 `;
 document.head.appendChild(style);
 
