@@ -1488,6 +1488,29 @@ style.textContent = `
   }
   .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
 
+  .btn-group-dual {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 14px;
+  }
+  .btn-group-dual .btn {
+    min-height: 42px;
+    background: rgba(255, 255, 255, 0.07);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    box-shadow: none;
+  }
+  .btn-group-dual .btn:hover {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255,255,255,0.18);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.22);
+  }
+  .btn-group-dual .btn:active {
+    transform: translateY(0);
+  }
+
   .btn-success {
     background: #2d8a4e;
     color: #fff;
@@ -1535,6 +1558,27 @@ style.textContent = `
   .num-input::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
+  }
+
+  .panel-select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(20, 24, 32, 0.96);
+    border: 1px solid rgba(255,255,255,0.14);
+    color: #f4f7fb;
+    font-size: 12px;
+    outline: none;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+    appearance: none;
+  }
+  .panel-select:focus {
+    border-color: rgba(74,144,217,0.55);
+    box-shadow: 0 0 0 3px rgba(74,144,217,0.12);
+  }
+  .panel-select option {
+    background: #161c26;
+    color: #f4f7fb;
   }
 
   input[type="range"] {
@@ -1623,13 +1667,6 @@ panel.innerHTML = `
   </div>
 
   <div class="panel-content">
-    <div class="toolbar-mini">
-      <button class="btn btn-secondary" id="undoBtn" title="Undo">Undo</button>
-      <button class="btn btn-secondary" id="redoBtn" title="Redo">Redo</button>
-      <button class="btn btn-secondary" id="saveProjectBtn" title="Save Project">Save</button>
-      <button class="btn btn-secondary" id="loadProjectBtn" title="Load Project">Open</button>
-    </div>
-
     <div class="tab-pane active" id="tab-create">
       <div class="control-card">
         <div class="section-label">Import File</div>
@@ -1646,7 +1683,7 @@ panel.innerHTML = `
       <div class="control-card">
         <div class="section-label">Shape Generator</div>
         <div class="input-group">
-          <input type="text" id="shapeLabelInput" placeholder="Describe a shape (e.g. 'lightning bolt')..." style="flex:1; padding:12px; background:rgba(0,0,0,0.2); border:1px solid var(--border); border-radius:10px; color:#fff; font-size:13px; outline:none; transition:border-color 0.2s;"/>
+          <input type="text" id="shapeLabelInput" placeholder="Describe a shape" style="flex:1; padding:12px; background:rgba(0,0,0,0.2); border:1px solid var(--border); border-radius:10px; color:#fff; font-size:13px; outline:none; transition:border-color 0.2s;"/>
           <button class="btn btn-primary" id="generateShapeBtn" style="width:auto; padding:0 18px;">Create</button>
         </div>
       </div>
@@ -1659,7 +1696,6 @@ panel.innerHTML = `
           <button class="preset-btn" data-preset="gear">Gear</button>
           <button class="preset-btn" data-preset="arrow">Arrow</button>
           <button class="preset-btn" data-preset="logo">Logo</button>
-          <button class="preset-btn" data-preset="crown">Crown</button>
         </div>
       </div>
     </div>
@@ -1686,7 +1722,7 @@ panel.innerHTML = `
           <label style="font-size:12px;">Enable Beveling</label>
           <div class="toggle active" id="bevelToggle"></div>
         </div>
-        <div class="btn-group-dual" style="margin-top:12px;">
+        <div class="btn-group-dual">
           <button class="btn btn-secondary" id="applyGeometrySelected">Apply to Selected</button>
           <button class="btn btn-secondary" id="applyGeometryAll">Apply to All</button>
         </div>
@@ -1716,7 +1752,7 @@ panel.innerHTML = `
             <input type="number" id="roughnessInput" class="num-input" value="0.4">
           </div>
         </div>
-        <div class="btn-group-dual" style="margin-top:12px;">
+        <div class="btn-group-dual">
           <button class="btn btn-secondary" id="applyMatBtn">Apply to Selected</button>
           <button class="btn btn-secondary" id="applyMatAllBtn">Apply to All</button>
         </div>
@@ -1726,7 +1762,7 @@ panel.innerHTML = `
         <div class="section-label">Environment Settings</div>
         <div class="slider-row">
           <label style="font-size:12px; display:block; margin-bottom:6px;">Lighting Setup</label>
-          <select id="lightPreset" class="panel-select" style="width:100%; padding:8px; border-radius:8px; background:rgba(0,0,0,0.2); border:1px solid var(--border); color:#fff; outline:none;">
+          <select id="lightPreset" class="panel-select">
             <option value="studio">Studio Environment</option>
             <option value="daylight">Outdoor Daylight</option>
             <option value="dramatic">High Contrast</option>
@@ -1735,7 +1771,7 @@ panel.innerHTML = `
         </div>
         <div class="slider-row">
           <label style="font-size:12px; display:block; margin-bottom:6px;">Viewport Background</label>
-          <select id="backgroundPreset" class="panel-select" style="width:100%; padding:8px; border-radius:8px; background:rgba(0,0,0,0.2); border:1px solid var(--border); color:#fff; outline:none;">
+          <select id="backgroundPreset" class="panel-select">
             <option value="sky">Clear Sky</option>
             <option value="night">Classic Dark</option>
             <option value="sand">Neutral Warm</option>
@@ -1803,8 +1839,8 @@ panel.innerHTML = `
           <button class="btn btn-secondary" id="alignBottomBtn" style="font-size:11px;">Align Min Y</button>
           <button class="btn btn-secondary" id="distributeHorizBtn" style="font-size:11px;">Distribute X</button>
         </div>
-        <div class="btn-group-dual" style="margin-top:12px;">
-          <button class="btn btn-primary" id="applyTransformSelected">Apply Selection</button>
+        <div class="btn-group-dual">
+          <button class="btn btn-secondary" id="applyTransformSelected">Apply Selection</button>
           <button class="btn btn-secondary" id="applyTransformAll">Apply to All</button>
         </div>
       </div>
@@ -1829,7 +1865,7 @@ panel.innerHTML = `
   <div class="panel-footer">
     <div id="exportStats" class="stat-box">No model loaded.</div>
     <div class="input-group">
-      <select id="downloadFormat" class="panel-select" style="flex:0.6; padding:8px; border-radius:8px; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:#fff; font-size:12px; outline:none;">
+      <select id="downloadFormat" class="panel-select" style="flex:0.6;">
         <option value="glb">GLB</option>
         <option value="gltf">GLTF</option>
         <option value="obj">OBJ</option>
@@ -1887,10 +1923,6 @@ document.getElementById('dockToggleBtn').addEventListener('click', () => {
   panelDock = panelDock === 'left' ? 'right' : 'left';
   updatePanelDock();
 });
-document.getElementById('undoBtn').addEventListener('click', undoChange);
-document.getElementById('redoBtn').addEventListener('click', redoChange);
-document.getElementById('saveProjectBtn').addEventListener('click', saveProjectToFile);
-document.getElementById('loadProjectBtn').addEventListener('click', () => projectFileInput.click());
 
 // Hidden file input
 const fileInput = document.createElement('input');
