@@ -1350,6 +1350,7 @@ style.textContent = `
     --text-main: #e0e0e0;
     --text-dim: rgba(255, 255, 255, 0.4);
     --radius: 12px;
+    --mobile-panel-height: 52vh;
   }
 
   .panel {
@@ -1646,6 +1647,10 @@ style.textContent = `
 
   .panel.right { left: auto; right: 12px; }
 
+  .panel-grab-handle {
+    display: none;
+  }
+
   @media (max-width: 820px) {
     .panel,
     .panel.right {
@@ -1654,7 +1659,7 @@ style.textContent = `
       top: auto;
       bottom: 8px;
       width: auto;
-      max-height: min(52vh, 460px);
+      max-height: min(var(--mobile-panel-height), 460px);
       min-height: 0;
       border-radius: 20px 20px 16px 16px;
       box-shadow: 0 22px 48px rgba(0,0,0,0.42);
@@ -1666,21 +1671,25 @@ style.textContent = `
     .panel::-webkit-scrollbar { width: 4px; }
     .panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
 
-    .panel-header {
-      padding: 10px 14px 8px;
-      position: relative;
+    .panel-grab-handle {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 8px 0 4px;
+      touch-action: none;
+      cursor: ns-resize;
     }
 
-    .panel-header::before {
+    .panel-grab-handle::before {
       content: '';
-      position: absolute;
-      top: 8px;
-      left: 50%;
-      transform: translateX(-50%);
       width: 44px;
       height: 4px;
       border-radius: 999px;
       background: rgba(255,255,255,0.18);
+    }
+
+    .panel-header {
+      padding: 6px 14px 8px;
     }
 
     .panel-header h2 {
@@ -1796,6 +1805,7 @@ document.head.appendChild(style);
 const panel = document.createElement('div');
 panel.className = 'panel';
 panel.innerHTML = `
+  <div class="panel-grab-handle" id="panelGrabHandle" aria-label="Resize panel"></div>
   <div class="panel-header">
     <h2>3D Creator</h2>
     <div style="display:flex; gap:8px;">
@@ -2021,6 +2031,7 @@ panel.innerHTML = `
     <div class="btn-row" style="margin-top:10px;">
       <button class="btn btn-secondary" id="resetCam" style="font-size:11px;">↺ Reset View</button>
       <button class="btn btn-secondary" id="toggleWire" style="font-size:11px;">◫ Wireframe</button>
+      <button class="btn btn-secondary" id="resetAllBtn" style="font-size:11px;">Reset All</button>
     </div>
   </div>
 `;
@@ -2238,6 +2249,68 @@ document.getElementById('backgroundPreset').addEventListener('change', (e) => {
 document.getElementById('resetCam').addEventListener('click', () => {
   centerCameraOnGroup();
 });
+
+function updateWireframeButtonLabel() {
+  document.getElementById('toggleWire').textContent = wireframeOn ? 'Solid' : 'Wireframe';
+}
+
+function resetEditorState() {
+  extrusionDepth = 10;
+  bevelEnabled = true;
+  bevelSize = 0.5;
+  matColor = '#4a90d9';
+  matMetalness = 0.3;
+  matRoughness = 0.4;
+  transformOffsetX = 0;
+  transformOffsetY = 0;
+  transformRotationX = 0;
+  transformRotationY = 0;
+  transformRotationZ = 0;
+  transformScale = 1;
+  currentModelSource = { type: 'default', value: null };
+  downloadFormat = 'glb';
+  lightPreset = 'studio';
+  backgroundPreset = 'sky';
+  panelDock = 'left';
+  wireframeOn = false;
+
+  historyStack.length = 0;
+  redoStack.length = 0;
+
+  selectMesh(null);
+  createDefaultScene();
+  applySceneLooks();
+  updatePanelDock();
+
+  document.getElementById('svgInput').value = '';
+  document.getElementById('shapeLabelInput').value = '';
+  document.getElementById('renameInput').value = '';
+  document.getElementById('downloadFormat').value = downloadFormat;
+  document.getElementById('lightPreset').value = lightPreset;
+  document.getElementById('backgroundPreset').value = backgroundPreset;
+  syncDepth(extrusionDepth);
+  syncBevel(bevelSize);
+  bevelToggle.classList.add('active');
+  matColorPicker.value = matColor;
+  syncMetalness(matMetalness);
+  syncRoughness(matRoughness);
+  setTransformControlValues(
+    transformOffsetX,
+    transformOffsetY,
+    transformRotationX,
+    transformRotationY,
+    transformRotationZ,
+    transformScale
+  );
+  updateWireframeButtonLabel();
+  refreshMeshList();
+  updateExportStats();
+  centerCameraOnGroup();
+  recordHistory();
+  showNotification('Scene reset to defaults.', 'success');
+}
+
+document.getElementById('resetAllBtn').addEventListener('click', resetEditorState);
 
 // Position sliders
 const offsetYSlider = document.getElementById('offsetYSlider');
@@ -2495,9 +2568,49 @@ document.getElementById('toggleWire').addEventListener('click', () => {
       if (child.isMesh) child.material.wireframe = wireframeOn;
     });
   }
-  document.getElementById('toggleWire').textContent = wireframeOn ? 'Solid' : 'Wireframe';
+  updateWireframeButtonLabel();
   recordHistory();
 });
+
+const panelGrabHandle = document.getElementById('panelGrabHandle');
+let mobilePanelHeightVh = 52;
+let mobileResizeState = null;
+
+function setMobilePanelHeight(nextVh) {
+  mobilePanelHeightVh = Math.min(82, Math.max(24, nextVh));
+  document.documentElement.style.setProperty('--mobile-panel-height', `${mobilePanelHeightVh}vh`);
+}
+
+function beginMobilePanelResize(event) {
+  if (window.innerWidth > 820) return;
+  mobileResizeState = {
+    pointerId: event.pointerId,
+    startY: event.clientY,
+    startHeightVh: mobilePanelHeightVh
+  };
+  panelGrabHandle.setPointerCapture(event.pointerId);
+  event.preventDefault();
+}
+
+function updateMobilePanelResize(event) {
+  if (!mobileResizeState || event.pointerId !== mobileResizeState.pointerId) return;
+  const deltaPx = mobileResizeState.startY - event.clientY;
+  const deltaVh = (deltaPx / window.innerHeight) * 100;
+  setMobilePanelHeight(mobileResizeState.startHeightVh + deltaVh);
+}
+
+function endMobilePanelResize(event) {
+  if (!mobileResizeState || event.pointerId !== mobileResizeState.pointerId) return;
+  if (panelGrabHandle.hasPointerCapture(event.pointerId)) {
+    panelGrabHandle.releasePointerCapture(event.pointerId);
+  }
+  mobileResizeState = null;
+}
+
+panelGrabHandle.addEventListener('pointerdown', beginMobilePanelResize);
+panelGrabHandle.addEventListener('pointermove', updateMobilePanelResize);
+panelGrabHandle.addEventListener('pointerup', endMobilePanelResize);
+panelGrabHandle.addEventListener('pointercancel', endMobilePanelResize);
 
 // --- Per-mesh selection via click ---
 function clearMeshHighlight(mesh) {
@@ -2652,4 +2765,6 @@ setTransformControlValues(transformOffsetX, transformOffsetY, transformRotationX
 document.getElementById('lightPreset').value = lightPreset;
 document.getElementById('backgroundPreset').value = backgroundPreset;
 document.getElementById('downloadFormat').value = downloadFormat;
+updateWireframeButtonLabel();
+setMobilePanelHeight(mobilePanelHeightVh);
 recordHistory();
