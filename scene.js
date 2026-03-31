@@ -69,6 +69,9 @@ let currentModelSource = { type: 'default', value: null };
 let downloadFormat = 'glb';
 let transformOffsetX = 0;
 let transformOffsetY = 0;
+let transformRotationX = 0;
+let transformRotationY = 0;
+let transformRotationZ = 0;
 let transformScale = 1;
 let panelDock = 'left';
 let lightPreset = 'studio';
@@ -256,8 +259,9 @@ function buildExtrudeSettings(settings) {
 
 function registerEditableMesh(mesh, sourceDescriptor = null, geometrySettings = getDefaultGeometrySettings()) {
   mesh.userData.basePosition = mesh.position.clone();
+  mesh.userData.baseRotation = mesh.rotation.clone();
   mesh.userData.baseScale = mesh.scale.clone();
-  mesh.userData.transformState = { offsetX: 0, offsetY: 0, scale: 1 };
+  mesh.userData.transformState = { offsetX: 0, offsetY: 0, rotateX: 0, rotateY: 0, rotateZ: 0, scale: 1 };
   mesh.userData.sourceDescriptor = sourceDescriptor;
   mesh.userData.geometrySettings = cloneGeometrySettings(geometrySettings);
 }
@@ -269,18 +273,39 @@ function getMeshTransformState(mesh) {
   return mesh.userData.transformState;
 }
 
-function setTransformControlValues(offsetX = 0, offsetY = 0, scale = 1) {
+function setTransformControlValues(offsetX = 0, offsetY = 0, rx = 0, ry = 0, rz = 0, scale = 1) {
   transformOffsetX = offsetX;
   transformOffsetY = offsetY;
+  transformRotationX = rx;
+  transformRotationY = ry;
+  transformRotationZ = rz;
   transformScale = scale;
+  
   document.getElementById('offsetXSlider').value = offsetX;
   const offsetXInput = document.getElementById('offsetXInput');
   if (offsetXInput) offsetXInput.value = offsetX;
   document.getElementById('offsetXVal').textContent = Number(offsetX).toFixed(1);
+  
   document.getElementById('offsetYSlider').value = offsetY;
   const offsetYInput = document.getElementById('offsetYInput');
   if (offsetYInput) offsetYInput.value = offsetY;
   document.getElementById('offsetYVal').textContent = Number(offsetY).toFixed(1);
+  
+  document.getElementById('rotateXSlider').value = rx;
+  const rotateXInput = document.getElementById('rotateXInput');
+  if (rotateXInput) rotateXInput.value = rx;
+  document.getElementById('rotateXVal').textContent = Number(rx).toFixed(0);
+  
+  document.getElementById('rotateYSlider').value = ry;
+  const rotateYInput = document.getElementById('rotateYInput');
+  if (rotateYInput) rotateYInput.value = ry;
+  document.getElementById('rotateYVal').textContent = Number(ry).toFixed(0);
+  
+  document.getElementById('rotateZSlider').value = rz;
+  const rotateZInput = document.getElementById('rotateZInput');
+  if (rotateZInput) rotateZInput.value = rz;
+  document.getElementById('rotateZVal').textContent = Number(rz).toFixed(0);
+  
   document.getElementById('scaleSlider').value = scale;
   const scaleInput = document.getElementById('scaleInput');
   if (scaleInput) scaleInput.value = scale;
@@ -289,16 +314,29 @@ function setTransformControlValues(offsetX = 0, offsetY = 0, scale = 1) {
 
 function applyTransformStateToMesh(mesh, state) {
   const basePosition = mesh.userData.basePosition ?? mesh.position.clone();
+  const baseRotation = mesh.userData.baseRotation ?? mesh.rotation.clone();
   const baseScale = mesh.userData.baseScale ?? mesh.scale.clone();
+  
   mesh.position.set(basePosition.x + state.offsetX, basePosition.y + state.offsetY, basePosition.z);
+  
+  // Convert degrees to radians for Three.js
+  mesh.rotation.set(
+    baseRotation.x + THREE.MathUtils.degToRad(state.rotateX || 0),
+    baseRotation.y + THREE.MathUtils.degToRad(state.rotateY || 0),
+    baseRotation.z + THREE.MathUtils.degToRad(state.rotateZ || 0)
+  );
+  
   mesh.scale.set(baseScale.x * state.scale, baseScale.y * state.scale, baseScale.z * state.scale);
   mesh.updateMatrixWorld(true);
 }
 
-function applyTransformToMesh(mesh, offsetX, offsetY, scale) {
+function applyTransformToMesh(mesh, offsetX, offsetY, rx, ry, rz, scale) {
   const state = getMeshTransformState(mesh);
   state.offsetX = offsetX;
   state.offsetY = offsetY;
+  state.rotateX = rx;
+  state.rotateY = ry;
+  state.rotateZ = rz;
   state.scale = scale;
   applyTransformStateToMesh(mesh, state);
 }
@@ -687,15 +725,14 @@ function generate3DText(text) {
   showNotification('3D text created!', 'success');
 }
 
-// Handle prompt submission
+// Handle shape generator submission
 function handlePrompt(promptText) {
   const p = promptText.trim();
   if (!p) {
-    showNotification('Please enter a prompt.', 'error');
+    showNotification('Please enter a name.', 'error');
     return;
   }
 
-  // Try to generate SVG from the prompt
   const svg = generateSVGFromPrompt(p);
   if (svg) {
     document.getElementById('svgInput').value = svg;
@@ -705,7 +742,6 @@ function handlePrompt(promptText) {
     return;
   }
 
-  // If no shape matched, treat the prompt as text to extrude into 3D
   generate3DText(p);
   updateExportStats();
   recordHistory();
@@ -1459,6 +1495,14 @@ style.textContent = `
     color: #fff;
     font-size: 11px;
     text-align: center;
+    -webkit-appearance: none;
+    -moz-appearance: textfield;
+  }
+  
+  .num-input::-webkit-outer-spin-button,
+  .num-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
   }
 
   input[type="range"] {
@@ -1533,10 +1577,10 @@ const panel = document.createElement('div');
 panel.className = 'panel';
 panel.innerHTML = `
   <div class="panel-header">
-    <h2>SVG → 3D</h2>
+    <h2>3D Creator</h2>
     <div style="display:flex; gap:8px;">
-      <button id="dockToggleBtn" class="btn-secondary" style="padding:6px; border-radius:6px; border:none; cursor:pointer;" title="Switch Side">⇆</button>
-      <button id="panelCloseBtn" class="btn-secondary" style="padding:6px; border-radius:6px; border:none; cursor:pointer;" title="Close">✕</button>
+      <button id="dockToggleBtn" class="btn-secondary" style="padding:6px 10px; border-radius:6px; border:none; cursor:pointer;" title="Switch Side">Dock</button>
+      <button id="panelCloseBtn" class="btn-secondary" style="padding:6px 10px; border-radius:6px; border:none; cursor:pointer;" title="Close">Hide</button>
     </div>
   </div>
 
@@ -1548,34 +1592,32 @@ panel.innerHTML = `
 
   <div class="panel-content">
     <div class="toolbar-mini">
-      <button class="btn btn-secondary" id="undoBtn" title="Undo">⟲</button>
-      <button class="btn btn-secondary" id="redoBtn" title="Redo">⟳</button>
-      <button class="btn btn-secondary" id="saveProjectBtn" title="Save Project">💾</button>
-      <button class="btn btn-secondary" id="loadProjectBtn" title="Load Project">📂</button>
+      <button class="btn btn-secondary" id="undoBtn" title="Undo">Undo</button>
+      <button class="btn btn-secondary" id="redoBtn" title="Redo">Redo</button>
+      <button class="btn btn-secondary" id="saveProjectBtn" title="Save Project">Save</button>
+      <button class="btn btn-secondary" id="loadProjectBtn" title="Load Project">Open</button>
     </div>
 
-    <!-- CREATE TAB -->
     <div class="tab-pane active" id="tab-create">
       <div class="control-card">
-        <div class="section-label"><span>📥</span> Import SVG</div>
+        <div class="section-label">Import File</div>
         <div class="file-upload" id="fileUpload">
-          <span class="icon">📄</span>
-          <span>Drop SVG or Click</span>
+           <span>Drop SVG or Click to Upload</span>
         </div>
-        <textarea class="svg-input" id="svgInput" placeholder="Paste SVG code..."></textarea>
-        <button class="btn btn-primary" id="convertBtn" style="margin-top:10px;">⚡ Convert to 3D</button>
+        <textarea class="svg-input" id="svgInput" placeholder="Paste SVG code here..."></textarea>
+        <button class="btn btn-primary" id="convertBtn" style="margin-top:10px;">Convert to 3D Model</button>
       </div>
 
       <div class="control-card">
-        <div class="section-label"><span>✨</span> Prompt to 3D</div>
+        <div class="section-label">Shape Generator</div>
         <div class="input-group">
-          <input type="text" id="promptInput" placeholder="e.g. 'Star', 'Heart'..." style="flex:1; padding:10px; background:rgba(0,0,0,0.2); border:1px solid var(--border); border-radius:8px; color:#fff; font-size:12px; outline:none;"/>
-          <button class="btn btn-primary" id="promptBtn" style="width:auto; padding:10px 14px;">✦</button>
+          <input type="text" id="promptInput" placeholder="Enter shape name (e.g. 'Star', 'Heart')..." style="flex:1; padding:10px; background:rgba(0,0,0,0.2); border:1px solid var(--border); border-radius:8px; color:#fff; font-size:12px; outline:none;"/>
+          <button class="btn btn-primary" id="promptBtn" style="width:auto; padding:10px 14px;">Generate</button>
         </div>
       </div>
 
       <div class="control-card">
-        <div class="section-label"><span>📦</span> Presets</div>
+        <div class="section-label">Library Presets</div>
         <div class="presets-grid">
           <button class="preset-btn" data-preset="star">Star</button>
           <button class="preset-btn" data-preset="heart">Heart</button>
@@ -1590,140 +1632,163 @@ panel.innerHTML = `
     <!-- DESIGN TAB -->
     <div class="tab-pane" id="tab-design">
       <div class="control-card">
-        <div class="section-label"><span>📐</span> Geometry</div>
+        <div class="section-label">Geometry Settings</div>
         <div class="slider-row">
-          <div class="slider-header"><label>Depth</label><span class="val" id="depthVal">10</span></div>
+          <div class="slider-header"><label>Extrusion Depth</label><span class="val" id="depthVal">10</span></div>
           <div class="input-group">
             <input type="range" id="depthSlider" min="1" max="50" value="10">
             <input type="number" id="depthInput" class="num-input" value="10">
           </div>
         </div>
         <div class="slider-row">
-          <div class="slider-header"><label>Bevel</label><span class="val" id="bevelVal">0.5</span></div>
+          <div class="slider-header"><label>Bevel Radius</label><span class="val" id="bevelVal">0.5</span></div>
           <div class="input-group">
             <input type="range" id="bevelSlider" min="0" max="3" step="0.1" value="0.5">
             <input type="number" id="bevelInput" class="num-input" value="0.5">
           </div>
         </div>
         <div class="toggle-row">
-          <label style="font-size:12px;">Enable Bevel</label>
+          <label style="font-size:12px;">Enable Beveling</label>
           <div class="toggle active" id="bevelToggle"></div>
         </div>
-        <div class="btn-row" style="margin-top:12px;">
-          <button class="btn btn-secondary" id="applyGeometrySelected">Apply Selection</button>
-          <button class="btn btn-secondary" id="applyGeometryAll">Apply All</button>
+        <div class="btn-group-dual" style="margin-top:12px;">
+          <button class="btn btn-secondary" id="applyGeometrySelected">Apply to Selected</button>
+          <button class="btn btn-secondary" id="applyGeometryAll">Apply to All</button>
         </div>
       </div>
 
       <div class="control-card">
-        <div class="section-label"><span>🎨</span> Material</div>
+        <div class="section-label">Material & Color</div>
         <div id="selectionInfo" style="display:none; align-items:center; gap:8px; margin-bottom:12px; padding:8px; background:rgba(74,144,217,0.1); border:1px solid var(--accent-glow); border-radius:8px;">
-          <span id="selectionName" style="font-size:11px; color:var(--accent); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Part</span>
-          <span id="deselectBtn" style="font-size:14px; cursor:pointer;" title="Deselect">✕</span>
+          <span id="selectionName" style="font-size:11px; color:var(--accent); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Target Object</span>
+          <span id="deselectBtn" style="font-size:14px; cursor:pointer;" title="Deselect">Clear</span>
         </div>
         <div class="slider-row">
-          <div class="slider-header"><label>Color</label></div>
+          <div class="slider-header"><label>Surface Color</label></div>
           <input type="color" id="matColorPicker" value="#4a90d9" style="width:100%; height:32px; border:none; border-radius:6px; background:transparent; cursor:pointer;">
         </div>
         <div class="slider-row">
-          <div class="slider-header"><label>Metalness</label><span class="val" id="metalnessVal">0.3</span></div>
+          <div class="slider-header"><label>Metallic Finish</label><span class="val" id="metalnessVal">0.3</span></div>
           <div class="input-group">
             <input type="range" id="metalnessSlider" min="0" max="1" step="0.05" value="0.3">
             <input type="number" id="metalnessInput" class="num-input" value="0.3">
           </div>
         </div>
         <div class="slider-row">
-          <div class="slider-header"><label>Roughness</label><span class="val" id="roughnessVal">0.4</span></div>
+          <div class="slider-header"><label>Surface Roughness</label><span class="val" id="roughnessVal">0.4</span></div>
           <div class="input-group">
             <input type="range" id="roughnessSlider" min="0" max="1" step="0.05" value="0.4">
             <input type="number" id="roughnessInput" class="num-input" value="0.4">
           </div>
         </div>
-        <div class="btn-row" style="margin-top:12px;">
-          <button class="btn btn-secondary" id="applyMatBtn">Apply Selection</button>
-          <button class="btn btn-secondary" id="applyMatAllBtn">Apply All</button>
+        <div class="btn-group-dual" style="margin-top:12px;">
+          <button class="btn btn-secondary" id="applyMatBtn">Apply to Selected</button>
+          <button class="btn btn-secondary" id="applyMatAllBtn">Apply to All</button>
         </div>
       </div>
 
       <div class="control-card">
-        <div class="section-label"><span>🌖</span> Scene Effects</div>
+        <div class="section-label">Environment Settings</div>
         <div class="slider-row">
-          <label style="font-size:12px; display:block; margin-bottom:6px;">Lighting Preset</label>
+          <label style="font-size:12px; display:block; margin-bottom:6px;">Lighting Setup</label>
           <select id="lightPreset" class="panel-select" style="width:100%; padding:8px; border-radius:8px; background:rgba(0,0,0,0.2); border:1px solid var(--border); color:#fff; outline:none;">
-            <option value="studio">Studio</option>
-            <option value="daylight">Daylight</option>
-            <option value="dramatic">Dramatic</option>
-            <option value="soft">Soft</option>
+            <option value="studio">Studio Environment</option>
+            <option value="daylight">Outdoor Daylight</option>
+            <option value="dramatic">High Contrast</option>
+            <option value="soft">Soft Ambient</option>
           </select>
         </div>
         <div class="slider-row">
-          <label style="font-size:12px; display:block; margin-bottom:6px;">Background</label>
+          <label style="font-size:12px; display:block; margin-bottom:6px;">Viewport Background</label>
           <select id="backgroundPreset" class="panel-select" style="width:100%; padding:8px; border-radius:8px; background:rgba(0,0,0,0.2); border:1px solid var(--border); color:#fff; outline:none;">
-            <option value="sky">Sky Blue</option>
-            <option value="night">Night Slate</option>
-            <option value="sand">Warm Sand</option>
-            <option value="mint">Mint Mist</option>
+            <option value="sky">Clear Sky</option>
+            <option value="night">Classic Dark</option>
+            <option value="sand">Neutral Warm</option>
+            <option value="mint">Neutral Cool</option>
           </select>
         </div>
       </div>
-    </div>
-
-    <!-- ARRANGE TAB -->
+    </div>    <!-- ARRANGE TAB -->
     <div class="tab-pane" id="tab-arrange">
       <div class="control-card">
-        <div class="section-label"><span>🎮</span> Transform</div>
+        <div class="section-label">Translation & Position</div>
         <div class="slider-row">
-          <div class="slider-header"><label>Vertical</label><span class="val" id="offsetYVal">0</span></div>
+          <div class="slider-header"><label>Y Position</label><span class="val" id="offsetYVal">0</span></div>
           <div class="input-group">
-            <input type="range" id="offsetYSlider" min="-60" max="60" step="0.5" value="0">
+            <input type="range" id="offsetYSlider" min="-100" max="100" step="0.5" value="0">
             <input type="number" id="offsetYInput" class="num-input" value="0">
           </div>
         </div>
         <div class="slider-row">
-          <div class="slider-header"><label>Horizontal</label><span class="val" id="offsetXVal">0</span></div>
+          <div class="slider-header"><label>X Position</label><span class="val" id="offsetXVal">0</span></div>
           <div class="input-group">
-            <input type="range" id="offsetXSlider" min="-60" max="60" step="0.5" value="0">
+            <input type="range" id="offsetXSlider" min="-100" max="100" step="0.5" value="0">
             <input type="number" id="offsetXInput" class="num-input" value="0">
           </div>
         </div>
         <div class="slider-row">
-          <div class="slider-header"><label>Scale</label><span class="val" id="scaleVal">1.00</span></div>
+          <div class="slider-header"><label>Uniform Scale</label><span class="val" id="scaleVal">1.0</span></div>
           <div class="input-group">
-            <input type="range" id="scaleSlider" min="0.2" max="3" step="0.05" value="1">
-            <input type="number" id="scaleInput" class="num-input" value="1">
+            <input type="range" id="scaleSlider" min="0.1" max="5" step="0.05" value="1.0">
+            <input type="number" id="scaleInput" class="num-input" value="1.0">
           </div>
         </div>
-        <div class="btn-row" style="margin-top:12px;">
-          <button class="btn btn-secondary" id="applyTransformSelected">Apply Selection</button>
-          <button class="btn btn-secondary" id="applyTransformAll">Apply All</button>
+      </div>
+
+      <div class="control-card">
+        <div class="section-label">Rotation Settings</div>
+        <div class="slider-row">
+          <div class="slider-header"><label>Rotation X (Vertical)</label><span class="val" id="rotateXVal">0</span></div>
+          <div class="input-group">
+            <input type="range" id="rotateXSlider" min="-180" max="180" step="1" value="0">
+            <input type="number" id="rotateXInput" class="num-input" value="0">
+          </div>
+        </div>
+        <div class="slider-row">
+          <div class="slider-header"><label>Rotation Y (Horizontal)</label><span class="val" id="rotateYVal">0</span></div>
+          <div class="input-group">
+            <input type="range" id="rotateYSlider" min="-180" max="180" step="1" value="0">
+            <input type="number" id="rotateYInput" class="num-input" value="0">
+          </div>
+        </div>
+        <div class="slider-row">
+          <div class="slider-header"><label>Rotation Z (Roll)</label><span class="val" id="rotateZVal">0</span></div>
+          <div class="input-group">
+            <input type="range" id="rotateZSlider" min="-180" max="180" step="1" value="0">
+            <input type="number" id="rotateZInput" class="num-input" value="0">
+          </div>
         </div>
       </div>
 
       <div class="control-card">
-        <div class="section-label"><span>🧩</span> Arrange</div>
-        <div class="btn-row">
-          <button class="btn btn-secondary" id="centerSelectedBtn">Center</button>
-          <button class="btn btn-secondary" id="alignLeftBtn">Align Left</button>
+        <div class="section-label">Layout Alignment</div>
+        <div class="grid-tools" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <button class="btn btn-secondary" id="centerSelectedBtn" style="font-size:11px;">Reset Placement</button>
+          <button class="btn btn-secondary" id="alignLeftBtn" style="font-size:11px;">Align Min X</button>
+          <button class="btn btn-secondary" id="alignBottomBtn" style="font-size:11px;">Align Min Y</button>
+          <button class="btn btn-secondary" id="distributeHorizBtn" style="font-size:11px;">Distribute X</button>
         </div>
-        <div class="btn-row" style="margin-top:8px;">
-          <button class="btn btn-secondary" id="alignBottomBtn">Align Bottom</button>
-          <button class="btn btn-secondary" id="distributeHorizBtn">Distribute X</button>
+        <div class="btn-group-dual" style="margin-top:12px;">
+          <button class="btn btn-primary" id="applyTransformSelected">Update Selected</button>
+          <button class="btn btn-secondary" id="applyTransformAll">Update All</button>
         </div>
       </div>
 
       <div class="control-card">
-        <div class="section-label"><span>📝</span> Organization</div>
-        <div class="input-group" style="margin-bottom:12px;">
-          <input type="text" id="renameInput" placeholder="Rename part..." style="flex:1; padding:10px; background:rgba(0,0,0,0.2); border:1px solid var(--border); border-radius:8px; color:#fff; font-size:12px; outline:none;"/>
+        <div class="section-label">Mesh Organization</div>
+        <div class="input-group" style="margin-bottom:10px;">
+          <input type="text" id="renameInput" placeholder="New object name..." style="flex:1; padding:10px; background:rgba(0,0,0,0.2); border:1px solid var(--border); border-radius:8px; color:#fff; font-size:12px; outline:none;"/>
           <button class="btn btn-secondary" id="renameBtn" style="width:auto; padding:10px 14px;">Rename</button>
         </div>
-        <div class="section-label" style="margin-top:16px;">Parts List</div>
-        <div id="meshList" style="display:flex; flex-direction:column; gap:6px; max-height:200px; overflow-y:auto; padding-right:4px;"></div>
-        <div class="btn-row" style="margin-top:16px;">
-          <button class="btn btn-secondary" id="deleteSelectedBtn" style="color:#d94a6b; border-color:rgba(217,74,107,0.2);">Delete Selected</button>
-          <button class="btn btn-secondary" id="deleteAllBtn" style="color:#d94a6b; border-color:rgba(217,74,107,0.2);">Delete All</button>
+        <div id="meshList" class="mesh-list-container" style="max-height:200px; overflow-y:auto; padding-right:4px;">
+           <!-- Parts will appear here -->
+        </div>
+        <div class="btn-group-dual" style="margin-top:12px;">
+          <button class="btn btn-secondary" id="deleteSelectedBtn" style="color:#ff6b6b; border-color:rgba(255,107,107,0.2);">Delete Selected</button>
+          <button class="btn btn-secondary" id="deleteAllBtn" style="color:#ff6b6b; border-color:rgba(255,107,107,0.2);">Delete All</button>
         </div>
       </div>
+    </div>
     </div>
   </div>
 
@@ -2017,15 +2082,51 @@ function syncScale(value) {
 scaleSlider.addEventListener('input', () => syncScale(scaleSlider.value));
 scaleInput.addEventListener('input', () => syncScale(scaleInput.value));
 
+const rotateXSlider = document.getElementById('rotateXSlider');
+const rotateXInput = document.getElementById('rotateXInput');
+const rotateXVal = document.getElementById('rotateXVal');
+function syncRotateX(value) {
+  transformRotationX = parseFloat(value);
+  rotateXSlider.value = transformRotationX;
+  rotateXInput.value = transformRotationX;
+  rotateXVal.textContent = transformRotationX.toFixed(0);
+}
+rotateXSlider.addEventListener('input', () => syncRotateX(rotateXSlider.value));
+rotateXInput.addEventListener('input', () => syncRotateX(rotateXInput.value));
+
+const rotateYSlider = document.getElementById('rotateYSlider');
+const rotateYInput = document.getElementById('rotateYInput');
+const rotateYVal = document.getElementById('rotateYVal');
+function syncRotateY(value) {
+  transformRotationY = parseFloat(value);
+  rotateYSlider.value = transformRotationY;
+  rotateYInput.value = transformRotationY;
+  rotateYVal.textContent = transformRotationY.toFixed(0);
+}
+rotateYSlider.addEventListener('input', () => syncRotateY(rotateYSlider.value));
+rotateYInput.addEventListener('input', () => syncRotateY(rotateYInput.value));
+
+const rotateZSlider = document.getElementById('rotateZSlider');
+const rotateZInput = document.getElementById('rotateZInput');
+const rotateZVal = document.getElementById('rotateZVal');
+function syncRotateZ(value) {
+  transformRotationZ = parseFloat(value);
+  rotateZSlider.value = transformRotationZ;
+  rotateZInput.value = transformRotationZ;
+  rotateZVal.textContent = transformRotationZ.toFixed(0);
+}
+rotateZSlider.addEventListener('input', () => syncRotateZ(rotateZSlider.value));
+rotateZInput.addEventListener('input', () => syncRotateZ(rotateZInput.value));
+
 function applyTransformToSelected() {
   if (selectedMeshes.length === 0) {
-    showNotification('Select a mesh first to apply individual changes.', 'error');
+    showNotification('Select an object first to apply changes.', 'error');
     return;
   }
   selectedMeshes.forEach(mesh => {
-    applyTransformToMesh(mesh, transformOffsetX, transformOffsetY, transformScale);
+    applyTransformToMesh(mesh, transformOffsetX, transformOffsetY, transformRotationX, transformRotationY, transformRotationZ, transformScale);
   });
-  showNotification(`Transform applied to ${selectedMeshes.length} selected mesh${selectedMeshes.length > 1 ? 'es' : ''}!`, 'success');
+  showNotification(`Updates applied to ${selectedMeshes.length} object${selectedMeshes.length > 1 ? 's' : ''}.`, 'success');
   refreshMeshList();
   updateExportStats();
   recordHistory();
@@ -2033,15 +2134,15 @@ function applyTransformToSelected() {
 
 function applyTransformToAll() {
   if (!currentSVGGroup) {
-    showNotification('Nothing to update.', 'error');
+    showNotification('No data to update.', 'error');
     return;
   }
   currentSVGGroup.traverse(child => {
     if (child.isMesh) {
-      applyTransformToMesh(child, transformOffsetX, transformOffsetY, transformScale);
+      applyTransformToMesh(child, transformOffsetX, transformOffsetY, transformRotationX, transformRotationY, transformRotationZ, transformScale);
     }
   });
-  showNotification('Transform applied to all meshes!', 'success');
+  showNotification('Updates applied to all objects.', 'success');
   refreshMeshList();
   updateExportStats();
   recordHistory();
