@@ -1390,6 +1390,8 @@ style.textContent = `
     flex: 1;
     overflow-y: auto;
     padding: 0 16px 16px;
+    height: 100%;
+    min-height: 0;
   }
   
   .panel-content::-webkit-scrollbar { width: 4px; }
@@ -1579,7 +1581,7 @@ panel.innerHTML = `
   <div class="panel-header">
     <h2>3D Creator</h2>
     <div style="display:flex; gap:8px;">
-      <button id="dockToggleBtn" class="btn-secondary" style="padding:6px 10px; border-radius:6px; border:none; cursor:pointer;" title="Switch Side">Dock</button>
+      <button id="dockToggleBtn" class="btn-secondary" style="padding:6px 10px; border-radius:6px; border:none; cursor:pointer;" title="Switch Side">Switch Side</button>
       <button id="panelCloseBtn" class="btn-secondary" style="padding:6px 10px; border-radius:6px; border:none; cursor:pointer;" title="Close">Hide</button>
     </div>
   </div>
@@ -1769,8 +1771,8 @@ panel.innerHTML = `
           <button class="btn btn-secondary" id="distributeHorizBtn" style="font-size:11px;">Distribute X</button>
         </div>
         <div class="btn-group-dual" style="margin-top:12px;">
-          <button class="btn btn-primary" id="applyTransformSelected">Update Selected</button>
-          <button class="btn btn-secondary" id="applyTransformAll">Update All</button>
+          <button class="btn btn-primary" id="applyTransformSelected">Apply Selection</button>
+          <button class="btn btn-secondary" id="applyTransformAll">Apply to All</button>
         </div>
       </div>
 
