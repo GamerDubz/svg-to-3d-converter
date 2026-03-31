@@ -1235,9 +1235,9 @@ function deleteMeshes(meshesToDelete) {
   }
   meshesToDelete.forEach(mesh => {
     clearMeshHighlight(mesh);
-    currentSVGGroup.remove(mesh);
-    mesh.geometry?.dispose();
-    disposeMaterial(mesh.material);
+    mesh.parent?.remove(mesh); // Fix: Remove from actual parent (could be nested)
+    if (mesh.geometry) mesh.geometry.dispose();
+    if (mesh.material) disposeMaterial(mesh.material);
   });
   selectedMeshes = [];
   selectedMesh = null;
@@ -1270,252 +1270,261 @@ function showNotification(message, type = 'info') {
   setTimeout(() => { notif.style.opacity = '0'; setTimeout(() => notif.remove(), 300); }, 2500);
 }
 
-// ========== UI ==========
+// ========== UI =========
 const style = document.createElement('style');
 style.textContent = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
   
+  :root {
+    --accent: #4a90d9;
+    --accent-glow: rgba(74, 144, 217, 0.3);
+    --bg-panel: rgba(13, 13, 23, 0.85);
+    --bg-card: rgba(255, 255, 255, 0.04);
+    --border: rgba(255, 255, 255, 0.08);
+    --text-main: #e0e0e0;
+    --text-dim: rgba(255, 255, 255, 0.4);
+    --radius: 12px;
+  }
+
   .panel {
     position: fixed;
     top: 12px;
     left: 12px;
-    width: 300px;
+    width: 320px;
     max-height: calc(100vh - 24px);
-    overflow-y: auto;
-    background: rgba(18, 18, 30, 0.92);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 12px;
-    padding: 20px;
-    font-family: Inter, sans-serif;
-    color: #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-panel);
+    backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--text-main);
     z-index: 1000;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    overflow: hidden;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  .panel::-webkit-scrollbar { width: 4px; }
-  .panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
-
-  .panel h2 {
-    font-size: 16px;
+  
+  .panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+  .panel-header h2 {
+    font-size: 15px;
     font-weight: 600;
-    margin-bottom: 4px;
+    letter-spacing: -0.2px;
     color: #fff;
-    letter-spacing: -0.3px;
   }
-  .panel .subtitle {
-    font-size: 11px;
-    color: rgba(255,255,255,0.4);
-    margin-bottom: 16px;
+
+  .tabs-nav {
+    display: flex;
+    padding: 4px;
+    background: rgba(0,0,0,0.2);
+    margin: 12px 16px;
+    border-radius: 10px;
+    gap: 2px;
   }
-  .section-label {
-    font-size: 11px;
-    font-weight: 500;
-    color: rgba(255,255,255,0.5);
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    margin: 16px 0 8px;
-  }
-  .svg-input {
-    width: 100%;
-    height: 120px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.1);
+  
+  .tab-btn {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
     border-radius: 8px;
-    color: #ccc;
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    padding: 10px;
-    resize: vertical;
-    outline: none;
-    transition: border-color 0.2s;
+    transition: all 0.2s;
   }
-  .svg-input:focus { border-color: rgba(74, 144, 217, 0.5); }
-  .svg-input::placeholder { color: rgba(255,255,255,0.2); }
+  
+  .tab-btn:hover { color: #fff; }
+  .tab-btn.active {
+    background: var(--bg-card);
+    color: var(--accent);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+
+  .panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 16px 16px;
+  }
+  
+  .panel-content::-webkit-scrollbar { width: 4px; }
+  .panel-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+  .tab-pane { display: none; }
+  .tab-pane.active { 
+    display: block; 
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .control-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+
+  .section-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
 
   .btn {
     width: 100%;
     padding: 10px;
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid var(--border);
     border-radius: 8px;
-    font-family: Inter, sans-serif;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 8px;
+    font-family: inherit;
   }
+  
   .btn-primary {
-    background: rgba(74, 144, 217, 0.2);
-    color: #6ab0f3;
-    border-color: rgba(74, 144, 217, 0.3);
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    box-shadow: 0 4px 12px var(--accent-glow);
   }
-  .btn-primary:hover { background: rgba(74, 144, 217, 0.35); }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 16px var(--accent-glow); }
+  
   .btn-secondary {
-    background: rgba(255,255,255,0.05);
-    color: #ccc;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-main);
   }
-  .btn-secondary:hover { background: rgba(255,255,255,0.1); }
-  .btn-success {
-    background: rgba(110, 200, 122, 0.15);
-    color: #6ec87a;
-    border-color: rgba(110, 200, 122, 0.3);
-  }
-  .btn-success:hover { background: rgba(110, 200, 122, 0.3); }
+  .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
 
-  .btn-row { display: flex; gap: 8px; }
-  .btn-row .btn { flex: 1; }
+  .btn-success {
+    background: #2d8a4e;
+    color: #fff;
+    border: none;
+  }
+
+  .toolbar-mini {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .toolbar-mini .btn { padding: 8px; font-size: 11px; }
 
   .slider-row {
+    margin: 12px 0;
+  }
+  .slider-header {
     display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .slider-header label { font-size: 12px; color: var(--text-main); }
+  .slider-header .val { font-size: 11px; color: var(--accent); font-weight: 700; }
+  
+  .input-group {
+    display: flex;
+    gap: 8px;
     align-items: center;
-    gap: 10px;
-    margin: 6px 0;
   }
-  .slider-row label {
-    font-size: 12px;
-    color: rgba(255,255,255,0.6);
-    min-width: 70px;
+  
+  .num-input {
+    width: 54px;
+    height: 28px;
+    background: rgba(0,0,0,0.2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 11px;
+    text-align: center;
   }
-  .slider-row input[type="range"] {
-    flex: 1;
+
+  input[type="range"] {
     -webkit-appearance: none;
+    width: 100%;
     height: 4px;
     background: rgba(255,255,255,0.1);
     border-radius: 2px;
     outline: none;
   }
-  .slider-row input[type="range"]::-webkit-slider-thumb {
+  input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
     width: 14px;
     height: 14px;
-    background: #4a90d9;
+    background: var(--accent);
     border-radius: 50%;
     cursor: pointer;
-  }
-  .slider-row .val {
-    font-size: 11px;
-    color: rgba(255,255,255,0.5);
-    min-width: 28px;
-    text-align: right;
-  }
-  .num-input {
-    width: 62px;
-    height: 30px;
-    border-radius: 8px;
-    border: 1px solid rgba(255,255,255,0.1);
-    background: rgba(255,255,255,0.05);
-    color: #f2f6fb;
-    padding: 0 8px;
-    font-size: 12px;
-  }
-  .panel-select {
-    flex: 1;
-    height: 32px;
-    border-radius: 8px;
-    border: 1px solid rgba(120, 190, 255, 0.45);
-    background: rgba(12, 18, 30, 0.96);
-    color: #f3f8ff;
-    padding: 0 10px;
-    font-size: 12px;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
-  }
-  .panel-select option {
-    background: #101826;
-    color: #f3f8ff;
+    box-shadow: 0 0 10px var(--accent-glow);
   }
 
-  .toggle-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin: 6px 0;
-  }
-  .toggle-row label {
-    font-size: 12px;
-    color: rgba(255,255,255,0.6);
-  }
-  .toggle {
-    width: 36px;
-    height: 20px;
-    background: rgba(255,255,255,0.1);
-    border-radius: 10px;
-    position: relative;
-    cursor: pointer;
-    transition: background 0.2s;
-  }
-  .toggle.active { background: rgba(74, 144, 217, 0.5); }
-  .toggle::after {
-    content: '';
-    width: 16px;
-    height: 16px;
-    background: #fff;
-    border-radius: 50%;
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    transition: left 0.2s;
-  }
-  .toggle.active::after { left: 18px; }
-
-  .divider {
-    height: 1px;
-    background: rgba(255,255,255,0.06);
-    margin: 14px 0;
-  }
-
-  .file-upload {
+  .svg-input {
     width: 100%;
-    padding: 16px;
-    border: 2px dashed rgba(255,255,255,0.12);
+    height: 100px;
+    background: rgba(0,0,0,0.2);
+    border: 1px solid var(--border);
     border-radius: 8px;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color 0.2s;
-    margin-bottom: 8px;
-  }
-  .file-upload:hover { border-color: rgba(74, 144, 217, 0.4); }
-  .file-upload span { font-size: 12px; color: rgba(255,255,255,0.4); }
-  .file-upload .icon { font-size: 20px; display: block; margin-bottom: 4px; }
-
-  .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
-  .preset-btn {
-    padding: 6px 10px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 6px;
     color: #aaa;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
     font-size: 11px;
-    font-family: Inter, sans-serif;
+    padding: 10px;
+    resize: none;
+    outline: none;
+  }
+
+  .presets-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .preset-btn {
+    padding: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-main);
+    font-size: 11px;
     cursor: pointer;
     transition: all 0.2s;
   }
-  .preset-btn:hover { background: rgba(74,144,217,0.2); color: #6ab0f3; border-color: rgba(74,144,217,0.3); }
-  .toolbar {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-    margin: 10px 0 14px;
+  .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .panel-footer {
+    padding: 16px;
+    background: rgba(0,0,0,0.3);
+    border-top: 1px solid var(--border);
   }
+
   .stat-box {
-    padding: 10px 12px;
-    border-radius: 10px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
     font-size: 11px;
-    color: rgba(255,255,255,0.68);
-    line-height: 1.5;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+    line-height: 1.6;
   }
-  .stat-box strong {
-    display: block;
-    color: #f2f6fb;
-    font-size: 14px;
-  }
-  .panel.right {
-    left: auto;
-    right: 12px;
-  }
+  .stat-box strong { color: #fff; display: block; font-size: 13px; margin-bottom: 2px; }
+
+  .panel.right { left: auto; right: 12px; }
 `;
 document.head.appendChild(style);
 
@@ -1523,224 +1532,231 @@ document.head.appendChild(style);
 const panel = document.createElement('div');
 panel.className = 'panel';
 panel.innerHTML = `
-  <div style="display:flex;align-items:center;justify-content:space-between;">
-    <h2>SVG → 3D Converter</h2>
-    <span id="panelCloseBtn" style="font-size:18px;color:rgba(255,255,255,0.4);cursor:pointer;line-height:1;padding:2px 6px;border-radius:4px;transition:color 0.2s;" title="Close panel">✕</span>
-  </div>
-  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
-    <p class="subtitle" style="margin:0;">Extrude SVG paths into 3D models</p>
-      <button class="btn btn-secondary" id="dockToggleBtn" style="width:auto;padding:8px 10px;">Switch Side</button>
-  </div>
-  <div class="toolbar">
-    <button class="btn btn-secondary" id="undoBtn">Undo</button>
-    <button class="btn btn-secondary" id="redoBtn">Redo</button>
-    <button class="btn btn-secondary" id="saveProjectBtn">Save Project</button>
-    <button class="btn btn-secondary" id="loadProjectBtn">Load Project</button>
+  <div class="panel-header">
+    <h2>SVG → 3D</h2>
+    <div style="display:flex; gap:8px;">
+      <button id="dockToggleBtn" class="btn-secondary" style="padding:6px; border-radius:6px; border:none; cursor:pointer;" title="Switch Side">⇆</button>
+      <button id="panelCloseBtn" class="btn-secondary" style="padding:6px; border-radius:6px; border:none; cursor:pointer;" title="Close">✕</button>
+    </div>
   </div>
 
-  <div class="section-label">Input SVG</div>
-  <div class="file-upload" id="fileUpload">
-    <span class="icon">📁</span>
-    <span>Drop SVG file or click to upload</span>
-  </div>
-  <textarea class="svg-input" id="svgInput" placeholder="Paste SVG code here...&#10;&#10;Example:&#10;<svg><circle cx='50' cy='50' r='40'/></svg>"></textarea>
-  <div style="height:8px"></div>
-  <button class="btn btn-primary" id="convertBtn">⚡ Convert to 3D</button>
-
-  <div class="divider"></div>
-  <div class="section-label">Prompt to 3D</div>
-  <div style="display:flex;gap:6px;">
-    <input type="text" id="promptInput" placeholder='e.g. "star", "heart", "Hello World"' style="
-      flex:1; padding:9px 12px; background:rgba(255,255,255,0.04);
-      border:1px solid rgba(255,255,255,0.1); border-radius:8px;
-      color:#ccc; font-family:Inter,sans-serif; font-size:12px; outline:none;
-    "/>
-    <button class="btn btn-primary" id="promptBtn" style="width:auto;padding:9px 14px;">✦ Create</button>
-  </div>
-  <div style="margin-top:4px;font-size:10px;color:rgba(255,255,255,0.3);line-height:1.4;">
-    Try shapes: star, heart, gear, moon, crown, tree, lightning…<br/>
-    Or type any text to extrude it into 3D.
+  <div class="tabs-nav">
+    <button class="tab-btn active" data-tab="create">Create</button>
+    <button class="tab-btn" data-tab="design">Design</button>
+    <button class="tab-btn" data-tab="arrange">Arrange</button>
   </div>
 
-  <div class="section-label">Presets</div>
-  <div class="presets">
-    <button class="preset-btn" data-preset="star">★ Star</button>
-    <button class="preset-btn" data-preset="heart">♥ Heart</button>
-    <button class="preset-btn" data-preset="gear">⚙ Gear</button>
-    <button class="preset-btn" data-preset="arrow">➤ Arrow</button>
-    <button class="preset-btn" data-preset="logo">◆ Logo</button>
+  <div class="panel-content">
+    <div class="toolbar-mini">
+      <button class="btn btn-secondary" id="undoBtn" title="Undo">⟲</button>
+      <button class="btn btn-secondary" id="redoBtn" title="Redo">⟳</button>
+      <button class="btn btn-secondary" id="saveProjectBtn" title="Save Project">💾</button>
+      <button class="btn btn-secondary" id="loadProjectBtn" title="Load Project">📂</button>
+    </div>
+
+    <!-- CREATE TAB -->
+    <div class="tab-pane active" id="tab-create">
+      <div class="control-card">
+        <div class="section-label"><span>📥</span> Import SVG</div>
+        <div class="file-upload" id="fileUpload">
+          <span class="icon">📄</span>
+          <span>Drop SVG or Click</span>
+        </div>
+        <textarea class="svg-input" id="svgInput" placeholder="Paste SVG code..."></textarea>
+        <button class="btn btn-primary" id="convertBtn" style="margin-top:10px;">⚡ Convert to 3D</button>
+      </div>
+
+      <div class="control-card">
+        <div class="section-label"><span>✨</span> Prompt to 3D</div>
+        <div class="input-group">
+          <input type="text" id="promptInput" placeholder="e.g. 'Star', 'Heart'..." style="flex:1; padding:10px; background:rgba(0,0,0,0.2); border:1px solid var(--border); border-radius:8px; color:#fff; font-size:12px; outline:none;"/>
+          <button class="btn btn-primary" id="promptBtn" style="width:auto; padding:10px 14px;">✦</button>
+        </div>
+      </div>
+
+      <div class="control-card">
+        <div class="section-label"><span>📦</span> Presets</div>
+        <div class="presets-grid">
+          <button class="preset-btn" data-preset="star">Star</button>
+          <button class="preset-btn" data-preset="heart">Heart</button>
+          <button class="preset-btn" data-preset="gear">Gear</button>
+          <button class="preset-btn" data-preset="arrow">Arrow</button>
+          <button class="preset-btn" data-preset="logo">Logo</button>
+          <button class="preset-btn" data-preset="crown">Crown</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DESIGN TAB -->
+    <div class="tab-pane" id="tab-design">
+      <div class="control-card">
+        <div class="section-label"><span>📐</span> Geometry</div>
+        <div class="slider-row">
+          <div class="slider-header"><label>Depth</label><span class="val" id="depthVal">10</span></div>
+          <div class="input-group">
+            <input type="range" id="depthSlider" min="1" max="50" value="10">
+            <input type="number" id="depthInput" class="num-input" value="10">
+          </div>
+        </div>
+        <div class="slider-row">
+          <div class="slider-header"><label>Bevel</label><span class="val" id="bevelVal">0.5</span></div>
+          <div class="input-group">
+            <input type="range" id="bevelSlider" min="0" max="3" step="0.1" value="0.5">
+            <input type="number" id="bevelInput" class="num-input" value="0.5">
+          </div>
+        </div>
+        <div class="toggle-row">
+          <label style="font-size:12px;">Enable Bevel</label>
+          <div class="toggle active" id="bevelToggle"></div>
+        </div>
+        <div class="btn-row" style="margin-top:12px;">
+          <button class="btn btn-secondary" id="applyGeometrySelected">Apply Selection</button>
+          <button class="btn btn-secondary" id="applyGeometryAll">Apply All</button>
+        </div>
+      </div>
+
+      <div class="control-card">
+        <div class="section-label"><span>🎨</span> Material</div>
+        <div id="selectionInfo" style="display:none; align-items:center; gap:8px; margin-bottom:12px; padding:8px; background:rgba(74,144,217,0.1); border:1px solid var(--accent-glow); border-radius:8px;">
+          <span id="selectionName" style="font-size:11px; color:var(--accent); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Part</span>
+          <span id="deselectBtn" style="font-size:14px; cursor:pointer;" title="Deselect">✕</span>
+        </div>
+        <div class="slider-row">
+          <div class="slider-header"><label>Color</label></div>
+          <input type="color" id="matColorPicker" value="#4a90d9" style="width:100%; height:32px; border:none; border-radius:6px; background:transparent; cursor:pointer;">
+        </div>
+        <div class="slider-row">
+          <div class="slider-header"><label>Metalness</label><span class="val" id="metalnessVal">0.3</span></div>
+          <div class="input-group">
+            <input type="range" id="metalnessSlider" min="0" max="1" step="0.05" value="0.3">
+            <input type="number" id="metalnessInput" class="num-input" value="0.3">
+          </div>
+        </div>
+        <div class="slider-row">
+          <div class="slider-header"><label>Roughness</label><span class="val" id="roughnessVal">0.4</span></div>
+          <div class="input-group">
+            <input type="range" id="roughnessSlider" min="0" max="1" step="0.05" value="0.4">
+            <input type="number" id="roughnessInput" class="num-input" value="0.4">
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:12px;">
+          <button class="btn btn-secondary" id="applyMatBtn">Apply Selection</button>
+          <button class="btn btn-secondary" id="applyMatAllBtn">Apply All</button>
+        </div>
+      </div>
+
+      <div class="control-card">
+        <div class="section-label"><span>🌖</span> Scene Effects</div>
+        <div class="slider-row">
+          <label style="font-size:12px; display:block; margin-bottom:6px;">Lighting Preset</label>
+          <select id="lightPreset" class="panel-select" style="width:100%; padding:8px; border-radius:8px; background:rgba(0,0,0,0.2); border:1px solid var(--border); color:#fff; outline:none;">
+            <option value="studio">Studio</option>
+            <option value="daylight">Daylight</option>
+            <option value="dramatic">Dramatic</option>
+            <option value="soft">Soft</option>
+          </select>
+        </div>
+        <div class="slider-row">
+          <label style="font-size:12px; display:block; margin-bottom:6px;">Background</label>
+          <select id="backgroundPreset" class="panel-select" style="width:100%; padding:8px; border-radius:8px; background:rgba(0,0,0,0.2); border:1px solid var(--border); color:#fff; outline:none;">
+            <option value="sky">Sky Blue</option>
+            <option value="night">Night Slate</option>
+            <option value="sand">Warm Sand</option>
+            <option value="mint">Mint Mist</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- ARRANGE TAB -->
+    <div class="tab-pane" id="tab-arrange">
+      <div class="control-card">
+        <div class="section-label"><span>🎮</span> Transform</div>
+        <div class="slider-row">
+          <div class="slider-header"><label>Vertical</label><span class="val" id="offsetYVal">0</span></div>
+          <div class="input-group">
+            <input type="range" id="offsetYSlider" min="-60" max="60" step="0.5" value="0">
+            <input type="number" id="offsetYInput" class="num-input" value="0">
+          </div>
+        </div>
+        <div class="slider-row">
+          <div class="slider-header"><label>Horizontal</label><span class="val" id="offsetXVal">0</span></div>
+          <div class="input-group">
+            <input type="range" id="offsetXSlider" min="-60" max="60" step="0.5" value="0">
+            <input type="number" id="offsetXInput" class="num-input" value="0">
+          </div>
+        </div>
+        <div class="slider-row">
+          <div class="slider-header"><label>Scale</label><span class="val" id="scaleVal">1.00</span></div>
+          <div class="input-group">
+            <input type="range" id="scaleSlider" min="0.2" max="3" step="0.05" value="1">
+            <input type="number" id="scaleInput" class="num-input" value="1">
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:12px;">
+          <button class="btn btn-secondary" id="applyTransformSelected">Apply Selection</button>
+          <button class="btn btn-secondary" id="applyTransformAll">Apply All</button>
+        </div>
+      </div>
+
+      <div class="control-card">
+        <div class="section-label"><span>🧩</span> Arrange</div>
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="centerSelectedBtn">Center</button>
+          <button class="btn btn-secondary" id="alignLeftBtn">Align Left</button>
+        </div>
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-secondary" id="alignBottomBtn">Align Bottom</button>
+          <button class="btn btn-secondary" id="distributeHorizBtn">Distribute X</button>
+        </div>
+      </div>
+
+      <div class="control-card">
+        <div class="section-label"><span>📝</span> Organization</div>
+        <div class="input-group" style="margin-bottom:12px;">
+          <input type="text" id="renameInput" placeholder="Rename part..." style="flex:1; padding:10px; background:rgba(0,0,0,0.2); border:1px solid var(--border); border-radius:8px; color:#fff; font-size:12px; outline:none;"/>
+          <button class="btn btn-secondary" id="renameBtn" style="width:auto; padding:10px 14px;">Rename</button>
+        </div>
+        <div class="section-label" style="margin-top:16px;">Parts List</div>
+        <div id="meshList" style="display:flex; flex-direction:column; gap:6px; max-height:200px; overflow-y:auto; padding-right:4px;"></div>
+        <div class="btn-row" style="margin-top:16px;">
+          <button class="btn btn-secondary" id="deleteSelectedBtn" style="color:#d94a6b; border-color:rgba(217,74,107,0.2);">Delete Selected</button>
+          <button class="btn btn-secondary" id="deleteAllBtn" style="color:#d94a6b; border-color:rgba(217,74,107,0.2);">Delete All</button>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div class="divider"></div>
-  <div class="section-label">Extrusion Settings</div>
-
-  <div class="slider-row">
-    <label>Depth</label>
-    <input type="range" id="depthSlider" min="1" max="50" value="10">
-    <input type="number" id="depthInput" class="num-input" min="1" max="50" step="0.5" value="10">
-    <span class="val" id="depthVal">10</span>
-  </div>
-  <div class="slider-row">
-    <label>Bevel Size</label>
-    <input type="range" id="bevelSlider" min="0" max="3" step="0.1" value="0.5">
-    <input type="number" id="bevelInput" class="num-input" min="0" max="3" step="0.1" value="0.5">
-    <span class="val" id="bevelVal">0.5</span>
-  </div>
-  <div class="toggle-row">
-    <label>Bevel</label>
-    <div class="toggle active" id="bevelToggle"></div>
-  </div>
-  <div class="btn-row" style="margin-top:6px;">
-    <button class="btn btn-secondary" id="applyGeometrySelected">Apply to Selected</button>
-    <button class="btn btn-secondary" id="applyGeometryAll">Apply All</button>
-  </div>
-
-  <div class="divider"></div>
-  <div class="section-label">Material</div>
-
-  <div id="selectionInfo" style="display:none; align-items:center; gap:8px; margin-bottom:8px;
-    padding:8px 10px; background:rgba(74,144,217,0.1); border:1px solid rgba(74,144,217,0.25);
-    border-radius:8px;">
-    <div style="width:8px;height:8px;border-radius:50%;background:#6ab0f3;flex-shrink:0;"></div>
-    <span id="selectionName" style="font-size:11px;color:#6ab0f3;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">mesh</span>
-    <span id="deselectBtn" style="font-size:16px;color:rgba(255,255,255,0.4);cursor:pointer;line-height:1;" title="Deselect">✕</span>
-  </div>
-  <div style="font-size:10px;color:rgba(255,255,255,0.3);margin-bottom:8px;line-height:1.4;">
-    Click a mesh to select it. Use the Selected or All buttons below for materials and transforms.
-  </div>
-
-  <div class="slider-row">
-    <label>Color</label>
-    <input type="color" id="matColorPicker" value="#4a90d9" style="
-      flex:1; height:28px; border:1px solid rgba(255,255,255,0.1);
-      border-radius:6px; background:rgba(255,255,255,0.04);
-      cursor:pointer; padding:2px;
-    "/>
-  </div>
-  <div class="slider-row">
-    <label>Metalness</label>
-    <input type="range" id="metalnessSlider" min="0" max="1" step="0.05" value="0.3">
-    <input type="number" id="metalnessInput" class="num-input" min="0" max="1" step="0.05" value="0.3">
-    <span class="val" id="metalnessVal">0.3</span>
-  </div>
-  <div class="slider-row">
-    <label>Roughness</label>
-    <input type="range" id="roughnessSlider" min="0" max="1" step="0.05" value="0.4">
-    <input type="number" id="roughnessInput" class="num-input" min="0" max="1" step="0.05" value="0.4">
-    <span class="val" id="roughnessVal">0.4</span>
-  </div>
-  <div class="btn-row" style="margin-top:6px;">
-    <button class="btn btn-secondary" id="applyMatBtn">🎨 Apply to Selected</button>
-    <button class="btn btn-secondary" id="applyMatAllBtn" style="flex:0.8;">🌐 Apply All</button>
-  </div>
-
-  <div class="divider"></div>
-  <div class="section-label">Download 3D Model</div>
-  <div class="slider-row">
-    <label>Format</label>
-    <select id="downloadFormat" class="panel-select">
-      <option value="glb">GLB</option>
-      <option value="gltf">GLTF</option>
-      <option value="obj">OBJ</option>
-      <option value="fbx">FBX</option>
-      <option value="stl">STL</option>
-    </select>
-  </div>
-  <div class="btn-row">
-    <button class="btn btn-success" id="downloadModel">⬇ Download Model</button>
-  </div>
-
-  <div class="divider"></div>
-  <div class="section-label">Position</div>
-  <div class="slider-row">
-    <label>Vertical</label>
-    <input type="range" id="offsetYSlider" min="-60" max="60" step="0.5" value="0">
-    <input type="number" id="offsetYInput" class="num-input" min="-60" max="60" step="0.5" value="0">
-    <span class="val" id="offsetYVal">0</span>
-  </div>
-  <div class="slider-row">
-    <label>Horizontal</label>
-    <input type="range" id="offsetXSlider" min="-60" max="60" step="0.5" value="0">
-    <input type="number" id="offsetXInput" class="num-input" min="-60" max="60" step="0.5" value="0">
-    <span class="val" id="offsetXVal">0</span>
-  </div>
-  <div class="slider-row">
-    <label>Size</label>
-    <input type="range" id="scaleSlider" min="0.2" max="3" step="0.05" value="1">
-    <input type="number" id="scaleInput" class="num-input" min="0.2" max="3" step="0.05" value="1">
-    <span class="val" id="scaleVal">1.00</span>
-  </div>
-  <div class="btn-row" style="margin-top:6px;">
-    <button class="btn btn-secondary" id="applyTransformSelected">Apply to Selected</button>
-    <button class="btn btn-secondary" id="applyTransformAll">Apply All</button>
-  </div>
-
-  <div class="divider"></div>
-  <div class="section-label">Arrange</div>
-  <div class="btn-row">
-    <button class="btn btn-secondary" id="centerSelectedBtn">Center</button>
-    <button class="btn btn-secondary" id="alignLeftBtn">Align Left</button>
-  </div>
-  <div class="btn-row" style="margin-top:8px;">
-    <button class="btn btn-secondary" id="alignBottomBtn">Align Bottom</button>
-    <button class="btn btn-secondary" id="distributeHorizBtn">Distribute X</button>
-  </div>
-
-  <div class="divider"></div>
-  <div class="section-label">Rename</div>
-  <div style="display:flex;gap:8px;">
-    <input type="text" id="renameInput" placeholder="Selected part name" style="
-      flex:1; padding:9px 12px; background:rgba(255,255,255,0.04);
-      border:1px solid rgba(255,255,255,0.1); border-radius:8px;
-      color:#ccc; font-family:Inter,sans-serif; font-size:12px; outline:none;
-    "/>
-    <button class="btn btn-secondary" id="renameBtn" style="width:auto;padding:9px 14px;">Rename</button>
-  </div>
-
-  <div class="divider"></div>
-  <div class="section-label">Delete</div>
-  <div class="btn-row">
-    <button class="btn btn-secondary" id="deleteSelectedBtn">Delete Selected</button>
-    <button class="btn btn-secondary" id="deleteAllBtn">Delete All</button>
-  </div>
-
-  <div class="divider"></div>
-  <div class="section-label">Mesh List</div>
-  <div id="meshList" style="display:flex;flex-direction:column;gap:4px;max-height:160px;overflow-y:auto;"></div>
-
-  <div class="divider"></div>
-  <div class="section-label">Scene Looks</div>
-  <div class="slider-row">
-    <label>Lighting</label>
-    <select id="lightPreset" class="panel-select">
-      <option value="studio">Studio</option>
-      <option value="daylight">Daylight</option>
-      <option value="dramatic">Dramatic</option>
-      <option value="soft">Soft</option>
-    </select>
-  </div>
-  <div class="slider-row">
-    <label>Background</label>
-    <select id="backgroundPreset" class="panel-select">
-      <option value="sky">Sky Blue</option>
-      <option value="night">Night Slate</option>
-      <option value="sand">Warm Sand</option>
-      <option value="mint">Mint Mist</option>
-    </select>
-  </div>
-
-  <div class="divider"></div>
-  <div class="section-label">Export Preview</div>
-  <div id="exportStats" class="stat-box">No model loaded.</div>
-
-  <div class="divider"></div>
-  <div class="section-label">Scene</div>
-  <div class="btn-row">
-    <button class="btn btn-secondary" id="resetCam">↺ Reset View</button>
-    <button class="btn btn-secondary" id="toggleWire">◫ Wireframe</button>
+  <div class="panel-footer">
+    <div id="exportStats" class="stat-box">No model loaded.</div>
+    <div class="input-group">
+      <select id="downloadFormat" class="panel-select" style="flex:0.6; padding:8px; border-radius:8px; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:#fff; font-size:12px; outline:none;">
+        <option value="glb">GLB</option>
+        <option value="gltf">GLTF</option>
+        <option value="obj">OBJ</option>
+        <option value="fbx">FBX</option>
+        <option value="stl">STL</option>
+      </select>
+      <button class="btn btn-success" id="downloadModel" style="flex:1;">⬇ Download</button>
+    </div>
+    <div class="btn-row" style="margin-top:10px;">
+      <button class="btn btn-secondary" id="resetCam" style="font-size:11px;">↺ Reset View</button>
+      <button class="btn btn-secondary" id="toggleWire" style="font-size:11px;">◫ Wireframe</button>
+    </div>
   </div>
 `;
 document.body.appendChild(panel);
+
+// Tab switching logic
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tabId = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(`tab-${tabId}`).classList.add('active');
+  });
+});
 
 // Panel toggle button (visible when panel is closed)
 const panelOpenBtn = document.createElement('button');
