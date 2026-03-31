@@ -284,32 +284,26 @@ function setTransformControlValues(offsetX = 0, offsetY = 0, rx = 0, ry = 0, rz 
   document.getElementById('offsetXSlider').value = offsetX;
   const offsetXInput = document.getElementById('offsetXInput');
   if (offsetXInput) offsetXInput.value = offsetX;
-  document.getElementById('offsetXVal').textContent = Number(offsetX).toFixed(1);
   
   document.getElementById('offsetYSlider').value = offsetY;
   const offsetYInput = document.getElementById('offsetYInput');
   if (offsetYInput) offsetYInput.value = offsetY;
-  document.getElementById('offsetYVal').textContent = Number(offsetY).toFixed(1);
   
   document.getElementById('rotateXSlider').value = rx;
   const rotateXInput = document.getElementById('rotateXInput');
   if (rotateXInput) rotateXInput.value = rx;
-  document.getElementById('rotateXVal').textContent = Number(rx).toFixed(0);
   
   document.getElementById('rotateYSlider').value = ry;
   const rotateYInput = document.getElementById('rotateYInput');
   if (rotateYInput) rotateYInput.value = ry;
-  document.getElementById('rotateYVal').textContent = Number(ry).toFixed(0);
   
   document.getElementById('rotateZSlider').value = rz;
   const rotateZInput = document.getElementById('rotateZInput');
   if (rotateZInput) rotateZInput.value = rz;
-  document.getElementById('rotateZVal').textContent = Number(rz).toFixed(0);
   
   document.getElementById('scaleSlider').value = scale;
   const scaleInput = document.getElementById('scaleInput');
   if (scaleInput) scaleInput.value = scale;
-  document.getElementById('scaleVal').textContent = Number(scale).toFixed(2);
 }
 
 function applyTransformStateToMesh(mesh, state) {
@@ -574,9 +568,9 @@ function centerCameraOnGroup() {
   controls.update();
 }
 
-// Generate SVG from a text prompt
-function generateSVGFromPrompt(prompt) {
-  const p = prompt.toLowerCase().trim();
+// Create SVG from object description
+function generateSVGFromLabel(label) {
+  const p = label.toLowerCase().trim();
 
   // Shape generators
   const shapes = {
@@ -725,15 +719,14 @@ function generate3DText(text) {
   showNotification('3D text created!', 'success');
 }
 
-// Handle shape generator submission
-function handlePrompt(promptText) {
-  const p = promptText.trim();
+// Handle shape generation
+function handleShapeGeneration(label) {
+  const p = label.trim();
   if (!p) {
     showNotification('Please enter a name.', 'error');
     return;
   }
-
-  const svg = generateSVGFromPrompt(p);
+  const svg = generateSVGFromLabel(p);
   if (svg) {
     document.getElementById('svgInput').value = svg;
     svgTo3D(svg, { type: 'svg', value: svg });
@@ -741,7 +734,6 @@ function handlePrompt(promptText) {
     recordHistory();
     return;
   }
-
   generate3DText(p);
   updateExportStats();
   recordHistory();
@@ -1213,13 +1205,13 @@ function alignSelectedMeshes(mode) {
   const boxes = selectedMeshes.map(getMeshBox);
   let target;
   if (mode === 'left') {
-    target = selectedMeshes.length === 1 ? 0 : Math.min(...boxes.map(box => box.min.x));
+    target = Math.min(...boxes.map(box => box.min.x));
   }
   if (mode === 'bottom') {
-    target = selectedMeshes.length === 1 ? 0 : Math.min(...boxes.map(box => box.min.y));
+    target = Math.min(...boxes.map(box => box.min.y));
   }
-  selectedMeshes.forEach((mesh, index) => {
-    const box = boxes[index];
+  selectedMeshes.forEach((mesh) => {
+    const box = getMeshBox(mesh);
     const state = getMeshTransformState(mesh);
     if (mode === 'left') {
       state.offsetX += target - box.min.x;
@@ -1603,18 +1595,21 @@ panel.innerHTML = `
     <div class="tab-pane active" id="tab-create">
       <div class="control-card">
         <div class="section-label">Import File</div>
-        <div class="file-upload" id="fileUpload">
-           <span>Drop SVG or Click to Upload</span>
+        <div id="fileUpload" class="upload-zone">
+          <span style="font-size:12px;opacity:0.8;">Drop SVG file here</span>
+          <textarea id="svgInput" placeholder="...or paste SVG code here" style="width:100%; height:80px; margin-top:10px; background:rgba(0,0,0,0.2); border:1px solid var(--border); border-radius:8px; color:#fff; font-size:11px; padding:8px; resize:none; overflow-y:auto; scrollbar-width:thin;"></textarea>
         </div>
-        <textarea class="svg-input" id="svgInput" placeholder="Paste SVG code here..."></textarea>
-        <button class="btn btn-primary" id="convertBtn" style="margin-top:10px;">Convert to 3D Model</button>
+        <div class="btn-group-dual" style="margin-top:10px;">
+          <button class="btn btn-secondary" id="importSvgBtn">Choose File</button>
+          <button class="btn btn-primary" id="convertBtn">Convert Code</button>
+        </div>
       </div>
 
       <div class="control-card">
         <div class="section-label">Shape Generator</div>
         <div class="input-group">
-          <input type="text" id="promptInput" placeholder="Enter shape name (e.g. 'Star', 'Heart')..." style="flex:1; padding:10px; background:rgba(0,0,0,0.2); border:1px solid var(--border); border-radius:8px; color:#fff; font-size:12px; outline:none;"/>
-          <button class="btn btn-primary" id="promptBtn" style="width:auto; padding:10px 14px;">Generate</button>
+          <input type="text" id="shapeLabelInput" placeholder="Describe a shape (e.g. 'lightning bolt')..." style="flex:1; padding:12px; background:rgba(0,0,0,0.2); border:1px solid var(--border); border-radius:10px; color:#fff; font-size:13px; outline:none; transition:border-color 0.2s;"/>
+          <button class="btn btn-primary" id="generateShapeBtn" style="width:auto; padding:0 18px;">Create</button>
         </div>
       </div>
 
@@ -1636,14 +1631,14 @@ panel.innerHTML = `
       <div class="control-card">
         <div class="section-label">Geometry Settings</div>
         <div class="slider-row">
-          <div class="slider-header"><label>Extrusion Depth</label><span class="val" id="depthVal">10</span></div>
+          <div class="slider-header"><label>Extrusion Depth</label></div>
           <div class="input-group">
             <input type="range" id="depthSlider" min="1" max="50" value="10">
             <input type="number" id="depthInput" class="num-input" value="10">
           </div>
         </div>
         <div class="slider-row">
-          <div class="slider-header"><label>Bevel Radius</label><span class="val" id="bevelVal">0.5</span></div>
+          <div class="slider-header"><label>Bevel Radius</label></div>
           <div class="input-group">
             <input type="range" id="bevelSlider" min="0" max="3" step="0.1" value="0.5">
             <input type="number" id="bevelInput" class="num-input" value="0.5">
@@ -1670,14 +1665,14 @@ panel.innerHTML = `
           <input type="color" id="matColorPicker" value="#4a90d9" style="width:100%; height:32px; border:none; border-radius:6px; background:transparent; cursor:pointer;">
         </div>
         <div class="slider-row">
-          <div class="slider-header"><label>Metallic Finish</label><span class="val" id="metalnessVal">0.3</span></div>
+          <div class="slider-header"><label>Metallic Finish</label></div>
           <div class="input-group">
             <input type="range" id="metalnessSlider" min="0" max="1" step="0.05" value="0.3">
             <input type="number" id="metalnessInput" class="num-input" value="0.3">
           </div>
         </div>
         <div class="slider-row">
-          <div class="slider-header"><label>Surface Roughness</label><span class="val" id="roughnessVal">0.4</span></div>
+          <div class="slider-header"><label>Surface Roughness</label></div>
           <div class="input-group">
             <input type="range" id="roughnessSlider" min="0" max="1" step="0.05" value="0.4">
             <input type="number" id="roughnessInput" class="num-input" value="0.4">
@@ -1715,21 +1710,21 @@ panel.innerHTML = `
       <div class="control-card">
         <div class="section-label">Translation & Position</div>
         <div class="slider-row">
-          <div class="slider-header"><label>Y Position</label><span class="val" id="offsetYVal">0</span></div>
+          <div class="slider-header"><label>Y Position</label></div>
           <div class="input-group">
             <input type="range" id="offsetYSlider" min="-100" max="100" step="0.5" value="0">
             <input type="number" id="offsetYInput" class="num-input" value="0">
           </div>
         </div>
         <div class="slider-row">
-          <div class="slider-header"><label>X Position</label><span class="val" id="offsetXVal">0</span></div>
+          <div class="slider-header"><label>X Position</label></div>
           <div class="input-group">
             <input type="range" id="offsetXSlider" min="-100" max="100" step="0.5" value="0">
             <input type="number" id="offsetXInput" class="num-input" value="0">
           </div>
         </div>
         <div class="slider-row">
-          <div class="slider-header"><label>Uniform Scale</label><span class="val" id="scaleVal">1.0</span></div>
+          <div class="slider-header"><label>Uniform Scale</label></div>
           <div class="input-group">
             <input type="range" id="scaleSlider" min="0.1" max="5" step="0.05" value="1.0">
             <input type="number" id="scaleInput" class="num-input" value="1.0">
@@ -1740,21 +1735,21 @@ panel.innerHTML = `
       <div class="control-card">
         <div class="section-label">Rotation Settings</div>
         <div class="slider-row">
-          <div class="slider-header"><label>Rotation X (Vertical)</label><span class="val" id="rotateXVal">0</span></div>
+          <div class="slider-header"><label>Rotation X (Vertical)</label></div>
           <div class="input-group">
             <input type="range" id="rotateXSlider" min="-180" max="180" step="1" value="0">
             <input type="number" id="rotateXInput" class="num-input" value="0">
           </div>
         </div>
         <div class="slider-row">
-          <div class="slider-header"><label>Rotation Y (Horizontal)</label><span class="val" id="rotateYVal">0</span></div>
+          <div class="slider-header"><label>Rotation Y (Horizontal)</label></div>
           <div class="input-group">
             <input type="range" id="rotateYSlider" min="-180" max="180" step="1" value="0">
             <input type="number" id="rotateYInput" class="num-input" value="0">
           </div>
         </div>
         <div class="slider-row">
-          <div class="slider-header"><label>Rotation Z (Roll)</label><span class="val" id="rotateZVal">0</span></div>
+          <div class="slider-header"><label>Rotation Z (Roll)</label></div>
           <div class="input-group">
             <input type="range" id="rotateZSlider" min="-180" max="180" step="1" value="0">
             <input type="number" id="rotateZInput" class="num-input" value="0">
@@ -1790,7 +1785,6 @@ panel.innerHTML = `
           <button class="btn btn-secondary" id="deleteAllBtn" style="color:#ff6b6b; border-color:rgba(255,107,107,0.2);">Delete All</button>
         </div>
       </div>
-    </div>
     </div>
   </div>
 
@@ -1906,7 +1900,10 @@ const presets = {
 };
 
 // Event listeners
-document.getElementById('fileUpload').addEventListener('click', () => fileInput.click());
+document.getElementById('importSvgBtn').addEventListener('click', () => fileInput.click());
+document.getElementById('fileUpload').addEventListener('click', (e) => { 
+  if (e.target.tagName !== 'TEXTAREA') fileInput.click(); 
+});
 fileInput.addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (file) {
@@ -1965,24 +1962,20 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
 
 const depthSlider = document.getElementById('depthSlider');
 const depthInput = document.getElementById('depthInput');
-const depthVal = document.getElementById('depthVal');
 function syncDepth(value) {
   extrusionDepth = parseFloat(value);
   depthSlider.value = extrusionDepth;
   depthInput.value = extrusionDepth;
-  depthVal.textContent = extrusionDepth.toFixed(1);
 }
 depthSlider.addEventListener('input', () => syncDepth(depthSlider.value));
 depthInput.addEventListener('input', () => syncDepth(depthInput.value));
 
 const bevelSlider = document.getElementById('bevelSlider');
 const bevelInput = document.getElementById('bevelInput');
-const bevelValEl = document.getElementById('bevelVal');
 function syncBevel(value) {
   bevelSize = parseFloat(value);
   bevelSlider.value = bevelSize;
   bevelInput.value = bevelSize;
-  bevelValEl.textContent = bevelSize.toFixed(1);
 }
 bevelSlider.addEventListener('input', () => syncBevel(bevelSlider.value));
 bevelInput.addEventListener('input', () => syncBevel(bevelInput.value));
@@ -2003,12 +1996,12 @@ downloadFormatSelect.addEventListener('change', (e) => {
 
 document.getElementById('downloadModel').addEventListener('click', () => exportCurrentModel());
 
-// Prompt input
-document.getElementById('promptBtn').addEventListener('click', () => {
-  handlePrompt(document.getElementById('promptInput').value);
+// Shape generator controls
+document.getElementById('generateShapeBtn').addEventListener('click', () => {
+  handleShapeGeneration(document.getElementById('shapeLabelInput').value);
 });
-document.getElementById('promptInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') handlePrompt(document.getElementById('promptInput').value);
+document.getElementById('shapeLabelInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') handleShapeGeneration(document.getElementById('shapeLabelInput').value);
 });
 document.getElementById('renameBtn').addEventListener('click', () => {
   if (!selectedMesh) {
@@ -2050,12 +2043,10 @@ document.getElementById('resetCam').addEventListener('click', () => {
 // Position sliders
 const offsetYSlider = document.getElementById('offsetYSlider');
 const offsetYInput = document.getElementById('offsetYInput');
-const offsetYVal = document.getElementById('offsetYVal');
 function syncOffsetY(value) {
   transformOffsetY = parseFloat(value);
   offsetYSlider.value = transformOffsetY;
   offsetYInput.value = transformOffsetY;
-  offsetYVal.textContent = transformOffsetY.toFixed(1);
   applyTransformToSelected(true);
 }
 offsetYSlider.addEventListener('input', () => syncOffsetY(offsetYSlider.value));
@@ -2063,12 +2054,10 @@ offsetYInput.addEventListener('input', () => syncOffsetY(offsetYInput.value));
 
 const offsetXSlider = document.getElementById('offsetXSlider');
 const offsetXInput = document.getElementById('offsetXInput');
-const offsetXVal = document.getElementById('offsetXVal');
 function syncOffsetX(value) {
   transformOffsetX = parseFloat(value);
   offsetXSlider.value = transformOffsetX;
   offsetXInput.value = transformOffsetX;
-  offsetXVal.textContent = transformOffsetX.toFixed(1);
   applyTransformToSelected(true);
 }
 offsetXSlider.addEventListener('input', () => syncOffsetX(offsetXSlider.value));
@@ -2076,12 +2065,10 @@ offsetXInput.addEventListener('input', () => syncOffsetX(offsetXInput.value));
 
 const scaleSlider = document.getElementById('scaleSlider');
 const scaleInput = document.getElementById('scaleInput');
-const scaleVal = document.getElementById('scaleVal');
 function syncScale(value) {
   transformScale = parseFloat(value);
   scaleSlider.value = transformScale;
   scaleInput.value = transformScale;
-  scaleVal.textContent = transformScale.toFixed(2);
   applyTransformToSelected(true);
 }
 scaleSlider.addEventListener('input', () => syncScale(scaleSlider.value));
@@ -2089,12 +2076,10 @@ scaleInput.addEventListener('input', () => syncScale(scaleInput.value));
 
 const rotateXSlider = document.getElementById('rotateXSlider');
 const rotateXInput = document.getElementById('rotateXInput');
-const rotateXVal = document.getElementById('rotateXVal');
 function syncRotateX(value) {
   transformRotationX = parseFloat(value);
   rotateXSlider.value = transformRotationX;
   rotateXInput.value = transformRotationX;
-  rotateXVal.textContent = transformRotationX.toFixed(0);
   applyTransformToSelected(true);
 }
 rotateXSlider.addEventListener('input', () => syncRotateX(rotateXSlider.value));
@@ -2102,12 +2087,10 @@ rotateXInput.addEventListener('input', () => syncRotateX(rotateXInput.value));
 
 const rotateYSlider = document.getElementById('rotateYSlider');
 const rotateYInput = document.getElementById('rotateYInput');
-const rotateYVal = document.getElementById('rotateYVal');
 function syncRotateY(value) {
   transformRotationY = parseFloat(value);
   rotateYSlider.value = transformRotationY;
   rotateYInput.value = transformRotationY;
-  rotateYVal.textContent = transformRotationY.toFixed(0);
   applyTransformToSelected(true);
 }
 rotateYSlider.addEventListener('input', () => syncRotateY(rotateYSlider.value));
@@ -2115,12 +2098,10 @@ rotateYInput.addEventListener('input', () => syncRotateY(rotateYInput.value));
 
 const rotateZSlider = document.getElementById('rotateZSlider');
 const rotateZInput = document.getElementById('rotateZInput');
-const rotateZVal = document.getElementById('rotateZVal');
 function syncRotateZ(value) {
   transformRotationZ = parseFloat(value);
   rotateZSlider.value = transformRotationZ;
   rotateZInput.value = transformRotationZ;
-  rotateZVal.textContent = transformRotationZ.toFixed(0);
   applyTransformToSelected(true);
 }
 rotateZSlider.addEventListener('input', () => syncRotateZ(rotateZSlider.value));
@@ -2159,12 +2140,74 @@ function applyTransformToAll() {
   recordHistory();
 }
 
-document.getElementById('applyTransformSelected').addEventListener('click', applyTransformToSelected);
+document.getElementById('applyTransformSelected').addEventListener('click', () => applyTransformToSelected());
 document.getElementById('applyTransformAll').addEventListener('click', applyTransformToAll);
 document.getElementById('centerSelectedBtn').addEventListener('click', centerSelectedMeshes);
 document.getElementById('alignLeftBtn').addEventListener('click', () => alignSelectedMeshes('left'));
 document.getElementById('alignBottomBtn').addEventListener('click', () => alignSelectedMeshes('bottom'));
 document.getElementById('distributeHorizBtn').addEventListener('click', distributeSelectedHorizontally);
+
+function centerSelectedMeshes() {
+  if (selectedMeshes.length === 0) {
+    showNotification('Select an object to center it.', 'error');
+    return;
+  }
+  const box = new THREE.Box3().setFromObject(selectedMeshes[0]);
+  for (let i = 1; i < selectedMeshes.length; i++) {
+    box.expandByObject(selectedMeshes[i]);
+  }
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+  selectedMeshes.forEach(m => {
+    const state = getMeshTransformState(m);
+    state.offsetX -= center.x;
+    state.offsetY -= center.y;
+    applyTransformStateToMesh(m, state);
+  });
+  refreshMeshList();
+  recordHistory();
+  showNotification('Objects centered on origin.', 'success');
+}
+
+function alignSelectedMeshes(dir) {
+  if (selectedMeshes.length < 1) {
+    showNotification('Select objects to align.', 'error');
+    return;
+  }
+  const box = new THREE.Box3().setFromObject(selectedMeshes[0]);
+  for (let i = 1; i < selectedMeshes.length; i++) {
+    box.expandByObject(selectedMeshes[i]);
+  }
+  selectedMeshes.forEach(m => {
+    const mBox = new THREE.Box3().setFromObject(m);
+    const state = getMeshTransformState(m);
+    if (dir === 'left') state.offsetX += (box.min.x - mBox.min.x);
+    if (dir === 'bottom') state.offsetY += (box.min.y - mBox.min.y);
+    applyTransformStateToMesh(m, state);
+  });
+  refreshMeshList();
+  recordHistory();
+  showNotification(`Aligned to ${dir}.`, 'success');
+}
+
+function distributeSelectedHorizontally() {
+  if (selectedMeshes.length < 3) {
+    showNotification('Select 3 or more objects to distribute.', 'error');
+    return;
+  }
+  const sorted = [...selectedMeshes].sort((a, b) => a.position.x - b.position.x);
+  const startX = sorted[0].position.x;
+  const endX = sorted[sorted.length - 1].position.x;
+  const step = (endX - startX) / (sorted.length - 1);
+  sorted.forEach((m, i) => {
+    const state = getMeshTransformState(m);
+    state.offsetX += (startX + i * step) - m.position.x;
+    applyTransformStateToMesh(m, state);
+  });
+  refreshMeshList();
+  recordHistory();
+  showNotification('Distributed horizontally.', 'success');
+}
 
 // Mesh list panel
 function refreshMeshList() {
@@ -2260,24 +2303,20 @@ matColorPicker.addEventListener('input', (e) => {
 
 const metalnessSlider = document.getElementById('metalnessSlider');
 const metalnessInput = document.getElementById('metalnessInput');
-const metalnessVal = document.getElementById('metalnessVal');
 function syncMetalness(value) {
   matMetalness = parseFloat(value);
   metalnessSlider.value = matMetalness;
   metalnessInput.value = matMetalness;
-  metalnessVal.textContent = matMetalness.toFixed(2);
 }
 metalnessSlider.addEventListener('input', () => syncMetalness(metalnessSlider.value));
 metalnessInput.addEventListener('input', () => syncMetalness(metalnessInput.value));
 
 const roughnessSlider = document.getElementById('roughnessSlider');
 const roughnessInput = document.getElementById('roughnessInput');
-const roughnessVal = document.getElementById('roughnessVal');
 function syncRoughness(value) {
   matRoughness = parseFloat(value);
   roughnessSlider.value = matRoughness;
   roughnessInput.value = matRoughness;
-  roughnessVal.textContent = matRoughness.toFixed(2);
 }
 roughnessSlider.addEventListener('input', () => syncRoughness(roughnessSlider.value));
 roughnessInput.addEventListener('input', () => syncRoughness(roughnessInput.value));
@@ -2339,16 +2378,16 @@ function updateSelectionUI() {
     matMetalness = primary.material.metalness;
     matRoughness = primary.material.roughness;
     const transformState = getMeshTransformState(primary);
-    setTransformControlValues(transformState.offsetX, transformState.offsetY, transformState.scale);
+    setTransformControlValues(transformState.offsetX, transformState.offsetY, transformState.rotateX, transformState.rotateY, transformState.rotateZ, transformState.scale);
     const geometrySettings = getMeshGeometrySettings(primary);
     document.getElementById('depthSlider').value = geometrySettings.depth;
     document.getElementById('depthInput').value = geometrySettings.depth;
-    document.getElementById('depthVal').textContent = Number(geometrySettings.depth).toFixed(1);
-    document.getElementById('bevelSlider').value = geometrySettings.bevelSize;
-    document.getElementById('bevelInput').value = geometrySettings.bevelSize;
-    document.getElementById('bevelVal').textContent = Number(geometrySettings.bevelSize).toFixed(1);
+    const bevelSliderEl = document.getElementById('bevelSlider');
+    if (bevelSliderEl) bevelSliderEl.value = geometrySettings.bevelSize;
+    const bevelInputEl = document.getElementById('bevelInput');
+    if (bevelInputEl) bevelInputEl.value = geometrySettings.bevelSize;
     const bevelToggleEl = document.getElementById('bevelToggle');
-    bevelToggleEl.classList.toggle('active', geometrySettings.bevelEnabled);
+    if (bevelToggleEl) bevelToggleEl.classList.toggle('active', geometrySettings.bevelEnabled);
     document.getElementById('selectionInfo').style.display = 'flex';
     document.getElementById('selectionName').textContent = selectedMeshes.length === 1
       ? (primary.name || 'Unnamed mesh')
@@ -2472,7 +2511,7 @@ syncDepth(extrusionDepth);
 syncBevel(bevelSize);
 syncMetalness(matMetalness);
 syncRoughness(matRoughness);
-setTransformControlValues(transformOffsetX, transformOffsetY, transformScale);
+setTransformControlValues(transformOffsetX, transformOffsetY, transformRotationX, transformRotationY, transformRotationZ, transformScale);
 document.getElementById('lightPreset').value = lightPreset;
 document.getElementById('backgroundPreset').value = backgroundPreset;
 document.getElementById('downloadFormat').value = downloadFormat;
