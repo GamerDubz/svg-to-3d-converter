@@ -2056,6 +2056,7 @@ function syncOffsetY(value) {
   offsetYSlider.value = transformOffsetY;
   offsetYInput.value = transformOffsetY;
   offsetYVal.textContent = transformOffsetY.toFixed(1);
+  applyTransformToSelected(true);
 }
 offsetYSlider.addEventListener('input', () => syncOffsetY(offsetYSlider.value));
 offsetYInput.addEventListener('input', () => syncOffsetY(offsetYInput.value));
@@ -2068,6 +2069,7 @@ function syncOffsetX(value) {
   offsetXSlider.value = transformOffsetX;
   offsetXInput.value = transformOffsetX;
   offsetXVal.textContent = transformOffsetX.toFixed(1);
+  applyTransformToSelected(true);
 }
 offsetXSlider.addEventListener('input', () => syncOffsetX(offsetXSlider.value));
 offsetXInput.addEventListener('input', () => syncOffsetX(offsetXInput.value));
@@ -2080,6 +2082,7 @@ function syncScale(value) {
   scaleSlider.value = transformScale;
   scaleInput.value = transformScale;
   scaleVal.textContent = transformScale.toFixed(2);
+  applyTransformToSelected(true);
 }
 scaleSlider.addEventListener('input', () => syncScale(scaleSlider.value));
 scaleInput.addEventListener('input', () => syncScale(scaleInput.value));
@@ -2092,6 +2095,7 @@ function syncRotateX(value) {
   rotateXSlider.value = transformRotationX;
   rotateXInput.value = transformRotationX;
   rotateXVal.textContent = transformRotationX.toFixed(0);
+  applyTransformToSelected(true);
 }
 rotateXSlider.addEventListener('input', () => syncRotateX(rotateXSlider.value));
 rotateXInput.addEventListener('input', () => syncRotateX(rotateXInput.value));
@@ -2104,6 +2108,7 @@ function syncRotateY(value) {
   rotateYSlider.value = transformRotationY;
   rotateYInput.value = transformRotationY;
   rotateYVal.textContent = transformRotationY.toFixed(0);
+  applyTransformToSelected(true);
 }
 rotateYSlider.addEventListener('input', () => syncRotateY(rotateYSlider.value));
 rotateYInput.addEventListener('input', () => syncRotateY(rotateYInput.value));
@@ -2116,22 +2121,26 @@ function syncRotateZ(value) {
   rotateZSlider.value = transformRotationZ;
   rotateZInput.value = transformRotationZ;
   rotateZVal.textContent = transformRotationZ.toFixed(0);
+  applyTransformToSelected(true);
 }
 rotateZSlider.addEventListener('input', () => syncRotateZ(rotateZSlider.value));
 rotateZInput.addEventListener('input', () => syncRotateZ(rotateZInput.value));
 
-function applyTransformToSelected() {
+function applyTransformToSelected(isLive = false) {
   if (selectedMeshes.length === 0) {
-    showNotification('Select an object first to apply changes.', 'error');
+    if (!isLive) showNotification('Select an object first to apply changes.', 'error');
     return;
   }
   selectedMeshes.forEach(mesh => {
     applyTransformToMesh(mesh, transformOffsetX, transformOffsetY, transformRotationX, transformRotationY, transformRotationZ, transformScale);
   });
-  showNotification(`Updates applied to ${selectedMeshes.length} object${selectedMeshes.length > 1 ? 's' : ''}.`, 'success');
-  refreshMeshList();
-  updateExportStats();
-  recordHistory();
+  
+  if (!isLive) {
+    showNotification(`Updates applied to ${selectedMeshes.length} object${selectedMeshes.length > 1 ? 's' : ''}.`, 'success');
+    refreshMeshList();
+    updateExportStats();
+    recordHistory();
+  }
 }
 
 function applyTransformToAll() {
