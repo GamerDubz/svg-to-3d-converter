@@ -1,8 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
-import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
-import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js';
 import helvetikerRegular from 'three/examples/fonts/helvetiker_regular.typeface.json';
@@ -217,6 +215,16 @@ function createSolidMaterial(color) {
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 1
   });
+}
+
+async function loadGLTFExporter() {
+  const module = await import('three/examples/jsm/exporters/GLTFExporter.js');
+  return new module.GLTFExporter();
+}
+
+async function loadSTLExporter() {
+  const module = await import('three/examples/jsm/exporters/STLExporter.js');
+  return new module.STLExporter();
 }
 
 function finalizeMeshGeometry(geometry) {
@@ -740,13 +748,13 @@ function handleShapeGeneration(label) {
 }
 
 // Export GLTF/GLB
-function exportGLTF(binary = true) {
+async function exportGLTF(binary = true) {
   if (!currentSVGGroup) {
     showNotification('Nothing to export.', 'error');
     return;
   }
 
-  const exporter = new GLTFExporter();
+  const exporter = await loadGLTFExporter();
   const options = { binary: binary };
 
   exporter.parse(
@@ -771,13 +779,13 @@ function exportGLTF(binary = true) {
   );
 }
 
-function exportSTL() {
+async function exportSTL() {
   if (!currentSVGGroup) {
     showNotification('Nothing to export.', 'error');
     return;
   }
 
-  const exporter = new STLExporter();
+  const exporter = await loadSTLExporter();
   const result = exporter.parse(currentSVGGroup, { binary: false });
   const blob = new Blob([result], { type: 'model/stl' });
   triggerDownload(blob, 'svg-to-3d.stl');
@@ -922,10 +930,22 @@ function triggerDownload(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(link.href), 0);
 }
 
-function exportCurrentModel() {
+function loadSvgFile(file) {
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const svgText = event.target.result;
+    document.getElementById('svgInput').value = svgText;
+    svgTo3D(svgText, { type: 'svg', value: svgText });
+    updateExportStats();
+    recordHistory();
+  };
+  reader.readAsText(file);
+}
+
+async function exportCurrentModel() {
   switch (downloadFormat) {
     case 'gltf':
-      exportGLTF(false);
+      await exportGLTF(false);
       break;
     case 'obj':
       exportOBJ();
@@ -934,11 +954,11 @@ function exportCurrentModel() {
       exportFBX();
       break;
     case 'stl':
-      exportSTL();
+      await exportSTL();
       break;
     case 'glb':
     default:
-      exportGLTF(true);
+      await exportGLTF(true);
       break;
   }
 }
@@ -1182,6 +1202,24 @@ function applyGeometryToSelection(targetMeshes) {
   updateExportStats();
   refreshMeshList();
   recordHistory();
+}
+
+function getActiveTargetMeshes() {
+  return selectedMeshes.length > 0 ? selectedMeshes : getEditableMeshes();
+}
+
+function applyGeometryLive() {
+  const targetMeshes = getActiveTargetMeshes();
+  if (targetMeshes.length === 0) return;
+  const geometrySettings = {
+    depth: extrusionDepth,
+    bevelEnabled,
+    bevelSize
+  };
+  targetMeshes.forEach(mesh => applyGeometrySettingsToMesh(mesh, geometrySettings));
+  updateSelectionUI();
+  updateExportStats();
+  refreshMeshList();
 }
 
 function centerSelectedMeshes() {
@@ -1472,7 +1510,7 @@ style.textContent = `
     margin-bottom: 6px;
   }
   .slider-header label { font-size: 12px; color: var(--text-main); }
-  .slider-header .val { font-size: 11px; color: var(--accent); font-weight: 700; }
+  .slider-header .val { display: none; }
   
   .input-group {
     display: flex;
@@ -1906,16 +1944,7 @@ document.getElementById('fileUpload').addEventListener('click', (e) => {
 });
 fileInput.addEventListener('change', (e) => {
   const file = e.target.files[0];
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      document.getElementById('svgInput').value = ev.target.result;
-      svgTo3D(ev.target.result, { type: 'svg', value: ev.target.result });
-      updateExportStats();
-      recordHistory();
-    };
-    reader.readAsText(file);
-  }
+  if (file) loadSvgFile(file);
 });
 
 // Drag and drop
@@ -1926,16 +1955,7 @@ uploadArea.addEventListener('drop', (e) => {
   e.preventDefault();
   uploadArea.style.borderColor = 'rgba(255,255,255,0.12)';
   const file = e.dataTransfer.files[0];
-  if (file && file.name.endsWith('.svg')) {
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      document.getElementById('svgInput').value = ev.target.result;
-      svgTo3D(ev.target.result, { type: 'svg', value: ev.target.result });
-      updateExportStats();
-      recordHistory();
-    };
-    reader.readAsText(file);
-  }
+  if (file && file.name.endsWith('.svg')) loadSvgFile(file);
 });
 
 document.getElementById('convertBtn').addEventListener('click', () => {
@@ -1966,6 +1986,7 @@ function syncDepth(value) {
   extrusionDepth = parseFloat(value);
   depthSlider.value = extrusionDepth;
   depthInput.value = extrusionDepth;
+  applyGeometryLive();
 }
 depthSlider.addEventListener('input', () => syncDepth(depthSlider.value));
 depthInput.addEventListener('input', () => syncDepth(depthInput.value));
@@ -1976,6 +1997,7 @@ function syncBevel(value) {
   bevelSize = parseFloat(value);
   bevelSlider.value = bevelSize;
   bevelInput.value = bevelSize;
+  applyGeometryLive();
 }
 bevelSlider.addEventListener('input', () => syncBevel(bevelSlider.value));
 bevelInput.addEventListener('input', () => syncBevel(bevelInput.value));
@@ -1984,6 +2006,7 @@ const bevelToggle = document.getElementById('bevelToggle');
 bevelToggle.addEventListener('click', () => {
   bevelEnabled = !bevelEnabled;
   bevelToggle.classList.toggle('active');
+  applyGeometryLive();
 });
 
 document.getElementById('applyGeometrySelected').addEventListener('click', () => applyGeometryToSelection(selectedMeshes));
@@ -2108,19 +2131,23 @@ rotateZSlider.addEventListener('input', () => syncRotateZ(rotateZSlider.value));
 rotateZInput.addEventListener('input', () => syncRotateZ(rotateZInput.value));
 
 function applyTransformToSelected(isLive = false) {
-  if (selectedMeshes.length === 0) {
+  const targetMeshes = getActiveTargetMeshes();
+  if (targetMeshes.length === 0) {
     if (!isLive) showNotification('Select an object first to apply changes.', 'error');
     return;
   }
-  selectedMeshes.forEach(mesh => {
+  targetMeshes.forEach(mesh => {
     applyTransformToMesh(mesh, transformOffsetX, transformOffsetY, transformRotationX, transformRotationY, transformRotationZ, transformScale);
   });
   
   if (!isLive) {
-    showNotification(`Updates applied to ${selectedMeshes.length} object${selectedMeshes.length > 1 ? 's' : ''}.`, 'success');
+    showNotification(`Updates applied to ${targetMeshes.length} object${targetMeshes.length > 1 ? 's' : ''}.`, 'success');
     refreshMeshList();
     updateExportStats();
     recordHistory();
+  } else {
+    refreshMeshList();
+    updateExportStats();
   }
 }
 
@@ -2146,68 +2173,6 @@ document.getElementById('centerSelectedBtn').addEventListener('click', centerSel
 document.getElementById('alignLeftBtn').addEventListener('click', () => alignSelectedMeshes('left'));
 document.getElementById('alignBottomBtn').addEventListener('click', () => alignSelectedMeshes('bottom'));
 document.getElementById('distributeHorizBtn').addEventListener('click', distributeSelectedHorizontally);
-
-function centerSelectedMeshes() {
-  if (selectedMeshes.length === 0) {
-    showNotification('Select an object to center it.', 'error');
-    return;
-  }
-  const box = new THREE.Box3().setFromObject(selectedMeshes[0]);
-  for (let i = 1; i < selectedMeshes.length; i++) {
-    box.expandByObject(selectedMeshes[i]);
-  }
-  const center = new THREE.Vector3();
-  box.getCenter(center);
-  selectedMeshes.forEach(m => {
-    const state = getMeshTransformState(m);
-    state.offsetX -= center.x;
-    state.offsetY -= center.y;
-    applyTransformStateToMesh(m, state);
-  });
-  refreshMeshList();
-  recordHistory();
-  showNotification('Objects centered on origin.', 'success');
-}
-
-function alignSelectedMeshes(dir) {
-  if (selectedMeshes.length < 1) {
-    showNotification('Select objects to align.', 'error');
-    return;
-  }
-  const box = new THREE.Box3().setFromObject(selectedMeshes[0]);
-  for (let i = 1; i < selectedMeshes.length; i++) {
-    box.expandByObject(selectedMeshes[i]);
-  }
-  selectedMeshes.forEach(m => {
-    const mBox = new THREE.Box3().setFromObject(m);
-    const state = getMeshTransformState(m);
-    if (dir === 'left') state.offsetX += (box.min.x - mBox.min.x);
-    if (dir === 'bottom') state.offsetY += (box.min.y - mBox.min.y);
-    applyTransformStateToMesh(m, state);
-  });
-  refreshMeshList();
-  recordHistory();
-  showNotification(`Aligned to ${dir}.`, 'success');
-}
-
-function distributeSelectedHorizontally() {
-  if (selectedMeshes.length < 3) {
-    showNotification('Select 3 or more objects to distribute.', 'error');
-    return;
-  }
-  const sorted = [...selectedMeshes].sort((a, b) => a.position.x - b.position.x);
-  const startX = sorted[0].position.x;
-  const endX = sorted[sorted.length - 1].position.x;
-  const step = (endX - startX) / (sorted.length - 1);
-  sorted.forEach((m, i) => {
-    const state = getMeshTransformState(m);
-    state.offsetX += (startX + i * step) - m.position.x;
-    applyTransformStateToMesh(m, state);
-  });
-  refreshMeshList();
-  recordHistory();
-  showNotification('Distributed horizontally.', 'success');
-}
 
 // Mesh list panel
 function refreshMeshList() {
@@ -2299,6 +2264,9 @@ function applyMaterialToSelected() {
 const matColorPicker = document.getElementById('matColorPicker');
 matColorPicker.addEventListener('input', (e) => {
   matColor = e.target.value;
+  const targetMeshes = getActiveTargetMeshes();
+  targetMeshes.forEach(mesh => applyMaterialToMesh(mesh));
+  updateSelectionUI();
 });
 
 const metalnessSlider = document.getElementById('metalnessSlider');
@@ -2307,6 +2275,9 @@ function syncMetalness(value) {
   matMetalness = parseFloat(value);
   metalnessSlider.value = matMetalness;
   metalnessInput.value = matMetalness;
+  const targetMeshes = getActiveTargetMeshes();
+  targetMeshes.forEach(mesh => applyMaterialToMesh(mesh));
+  updateSelectionUI();
 }
 metalnessSlider.addEventListener('input', () => syncMetalness(metalnessSlider.value));
 metalnessInput.addEventListener('input', () => syncMetalness(metalnessInput.value));
@@ -2317,6 +2288,9 @@ function syncRoughness(value) {
   matRoughness = parseFloat(value);
   roughnessSlider.value = matRoughness;
   roughnessInput.value = matRoughness;
+  const targetMeshes = getActiveTargetMeshes();
+  targetMeshes.forEach(mesh => applyMaterialToMesh(mesh));
+  updateSelectionUI();
 }
 roughnessSlider.addEventListener('input', () => syncRoughness(roughnessSlider.value));
 roughnessInput.addEventListener('input', () => syncRoughness(roughnessInput.value));
@@ -2478,22 +2452,9 @@ renderer.domElement.addEventListener('pointerup', (e) => {
 });
 
 // Refresh mesh list when a new model is loaded — patch svgTo3D and generate3DText end
-const _origSvgTo3D = svgTo3D;
-function patchedRefresh() { refreshMeshList(); }
-
-// Observe currentSVGGroup changes via a small polling approach
-let _lastGroup = null;
-function checkGroupChange() {
-  if (currentSVGGroup !== _lastGroup) {
-    _lastGroup = currentSVGGroup;
-    refreshMeshList();
-  }
-}
-
 // Animation loop (no auto-rotate)
 function animate() {
   controls.update();
-  checkGroupChange();
   renderer.render(scene, camera);
 }
 renderer.setAnimationLoop(animate);
