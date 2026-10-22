@@ -1,5 +1,7 @@
 # SVG to 3D Converter
 
+Use a patched Node.js runtime matching package.json engines (Node 24.22.1 or later in the 24.x line). npm package updates do not update Node itself.
+
 Link to view: https://gamerdubz.github.io/svg-to-3d-converter/
 
 ## Setup
